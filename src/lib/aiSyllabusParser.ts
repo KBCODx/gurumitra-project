@@ -68,13 +68,21 @@ export function isProseSentence(str: string): boolean {
  */
 export function cleanChapterTitle(rawTitle: string): string {
   let clean = rawTitle
+    // Strip trailing period counts, marks, hours, weightage etc.
+    // e.g. "(15) Periods", "(15 Periods)", "(15 Periods, 6 Marks)", "[15 Periods]", "15 Periods"
+    .replace(/\s*[\(\[\{]?\s*(?:no\.?\s*of\s*)?\d+\s*[\)\]\}]?\s*(?:periods?|marks?|hours?|hrs?|pts?)\b.*$/i, '')
+    .replace(/\s*[\(\[\{]\s*(?:no\.?\s*of\s*)?(?:periods?|marks?|hours?|hrs?|pts?)\s*[:=]?\s*\d+.*$/i, '')
+    .replace(/\s*\(\s*\d+\s*(?:periods?|marks?|hours?|hrs?)[^)]*\)\s*$/i, '')
+    .replace(/\s*[-–—:]\s*\d+\s*(?:periods?|marks?|hours?|hrs?)\b.*$/i, '')
+    .replace(/\s+\d{1,2}\s+(?:marks?|periods?)\s*$/i, '')
+    .replace(/\s*\(?\d+\s*(?:marks?|periods?|hours?|hrs?|pts?)\)?\s*$/i, '')
+    .replace(/\s+\d{1,2}\s*$/, '') // trailing marks in syllabus tables like "I NUMBER SYSTEMS 06"
+    // Strip leading chapter/unit prefixes
     .replace(/^(?:chapter|unit|module|lesson|part|theme)\s*(?:[0-9]+|[ivx]+)?\s*[:.,\-–—\u2500\u2014\u2015]*\s*/i, '')
     .replace(/^section\s+(?:[0-9]+|[ivx]+|[a-e])\s*[:.,\-–—\u2500\u2014\u2015]*\s*/i, '')
     .replace(/^(?:[0-9]{1,2}|[IVX]{1,5})\s*[\.\)\]\-–—\u2500\u2014\u2015:,]+\s*/i, '')
     .replace(/^(?:[0-9]{1,2}|[IVX]{1,5})\s+([A-Z])/i, '$1')
     .replace(/^[•\-\*▪►\uF0B7\u2022\u25E6\u25AA\u25CF\u2023·\s]+/, '')
-    .replace(/\s*\(?\d+\s*(?:marks?|periods?|hours?|hrs?|pts?)\)?\s*$/i, '')
-    .replace(/\s+\d{1,2}\s*$/, '')
     .replace(/[:.,\-–—\u2500\u2014\u2015]+$/, '')
     .trim();
 
@@ -243,12 +251,15 @@ export function extractChaptersFromText(text: string, subject?: SubjectType): st
 
   const tryAddChapter = (rawTitle: string): boolean => {
     const raw = rawTitle.trim();
-    if (raw.length < 3 || raw.length > 80) return false;
+    if (raw.length < 3 || raw.length > 90) return false;
 
     // Skip noise/artifacts
     if (/^(obj|endobj|xref|trailer|startxref|stream|endstream|PDF-\d|filter|flatedecode)/i.test(raw)) return false;
-    if (metadataPatterns.some(pattern => pattern.test(raw))) return false;
-    if (isProseSentence(raw)) return false;
+
+    // Skip lines that are purely metadata headers or instructions
+    if (/^(?:time allowed|maximum marks|max marks|total marks|prescribed books?|reference books?|evaluation scheme|course structure|course overview|learning outcomes|internal assessment|external examination|theory paper|practical examination|assessment scheme|guidelines|general instructions|blueprint|design of question paper|all questions are compulsory|page\s*\d+|[-_=\s*#~]+|\d+|[ivxlcdm]+)$/i.test(raw)) {
+      return false;
+    }
 
     const clean = cleanChapterTitle(raw);
     if (clean.length < 3 || clean.length > 65) return false;
@@ -341,8 +352,8 @@ export function extractChaptersFromText(text: string, subject?: SubjectType): st
   // Handles: "1 ── Chemical Reactions and Equations", "1 Real Numbers", "Chapter 1: Real Numbers"
   // =========================================================================
   const numberedPatterns = [
-    /^\s*(?:chapter|unit|module|lesson|section|part|theme)\s*(?:[0-9]+|[ivx]+)?\s*[:.,\-–—\u2500\u2014\u2015]+\s*(.+)$/i,
-    /^\s*(?:[0-9]{1,2}|[IVX]{1,5})\s*[\.\)\]\-–—\u2500\u2014\u2015:]+\s*(.+)$/i,
+    /^\s*(?:chapter|unit|module|lesson|section|part|theme)\s*(?:[0-9]+|[ivx]+)?\s*[:.,\-–—\u2500\u2014\u2015\s]+\s*(.+)$/i,
+    /^\s*(?:[0-9]{1,2}|[IVX]{1,5})\s*[\.\)\]\-–—\u2500\u2014\u2015:,]+\s*(.+)$/i,
     /^\s*(?:[0-9]{1,2})\s+([A-Z][A-Za-z0-9\s,\-–—&'()]{2,60})\s*$/,
     /^\s*(?:[IVX]{1,5})\s+([A-Za-z][A-Za-z0-9\s,\-–—&']{3,60})\s*$/i
   ];
@@ -411,6 +422,33 @@ export function extractChaptersFromText(text: string, subject?: SubjectType): st
         if (items.length >= 2 && items.every(item => item.length <= 40 && !isProseSentence(item))) {
           items.forEach(it => tryAddChapter(it));
         }
+      }
+    }
+  }
+
+  // =========================================================================
+  // STAGE 8: Domain-Grounded Subject Chapter Recovery
+  // If fewer than 2 chapters were detected (e.g. complex PDF tables or non-standard formatting),
+  // scan for verified chapters physically mentioned in the uploaded document text.
+  // =========================================================================
+  if (chapters.length < 2) {
+    const mathChapters = [
+      'Real Numbers', 'Number Systems', 'Polynomials', 'Linear Equations',
+      'Pair of Linear Equations in Two Variables', 'Quadratic Equations',
+      'Arithmetic Progressions', 'Triangles', 'Coordinate Geometry',
+      'Introduction to Trigonometry', 'Trigonometry', 'Trigonometric Identities',
+      'Some Applications of Trigonometry', 'Heights and Distances', 'Circles',
+      'Constructions', 'Areas Related to Circles', 'Surface Areas and Volumes',
+      'Statistics', 'Probability', 'Sets', 'Relations and Functions',
+      'Inverse Trigonometric Functions', 'Matrices', 'Determinants',
+      'Continuity and Differentiability', 'Integrals', 'Differential Equations',
+      'Vector Algebra', 'Three Dimensional Geometry', 'Linear Programming'
+    ];
+    const candidateList = (!subject || subject === 'Mathematics') ? mathChapters : [];
+    for (const cand of candidateList) {
+      const reg = new RegExp(`\\b${cand.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+      if (reg.test(cleaned)) {
+        tryAddChapter(cand);
       }
     }
   }

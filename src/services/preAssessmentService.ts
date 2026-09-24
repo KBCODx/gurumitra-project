@@ -14,6 +14,19 @@ export type { ChapterQuestionAllocation };
 export const TARGET_PRE_ASSESSMENT_QUESTIONS = 30;
 
 /**
+ * Calculates dynamic target question count: 12-13 questions per selected subject
+ * 1 subject -> 13
+ * 2 subjects -> 26
+ * 3 subjects -> 39
+ * 4 subjects -> 52
+ */
+export function getTargetQuestionsForSubjects(selectedSubjects: (SubjectType | string)[]): number {
+  const count = selectedSubjects.length;
+  if (count <= 0) return 13;
+  return count * 13;
+}
+
+/**
  * Local client-side storage key for student's Gemini API Key
  */
 export const GEMINI_API_KEY_STORAGE_KEY = 'gurumitra_gemini_api_key';
@@ -1183,6 +1196,503 @@ export const CURRICULUM_QUESTION_BANK: Record<string, StaticQuestionTemplate[]> 
       correctOption: 0,
       explanation: 'Interrogatives without question words use "if" or "whether", the verb shifts to past ("exercised").'
     }
+  ],
+
+  // ================= SOCIAL SCIENCE =================
+  'Nationalism in India': [
+    {
+      topic: 'Rowlatt Act 1919',
+      difficulty: 'easy',
+      question: 'What was the primary repressive provision introduced by the Rowlatt Act passed by the Imperial Legislative Council in 1919?',
+      options: [
+        'It permitted the detention of political prisoners without trial for up to two years.',
+        'It completely banned all vernacular newspapers and printing presses in British India.',
+        'It made military service compulsory for all Indian male college students.',
+        'It doubled land revenue taxes and seized private farmland in Punjab.'
+      ],
+      correctOption: 0,
+      explanation: 'The Rowlatt Act of 1919 gave the British government enormous powers to repress political activities and allowed detention of political prisoners without trial for up to two years.'
+    },
+    {
+      topic: 'Jallianwala Bagh Massacre',
+      difficulty: 'moderate',
+      question: 'Why had a large peaceful crowd gathered in the enclosed ground of Jallianwala Bagh in Amritsar on 13 April 1919 before General Dyer opened fire?',
+      options: [
+        'To attend the annual Baisakhi fair and peacefully protest the arrest of national leaders.',
+        'To violently storm the British municipal police headquarters in Amritsar.',
+        'To demand an immediate declaration of war against the Ottoman Empire.',
+        'To celebrate the successful repeal of the Inland Emigration Act.'
+      ],
+      correctOption: 0,
+      explanation: 'On 13 April 1919, a crowd gathered at Jallianwala Bagh in Amritsar—some to protest against the government repressive Rowlatt Act and arrests of Dr. Saifuddin Kitchlew and Dr. Satyapal, and others to attend the annual Baisakhi fair.'
+    },
+    {
+      topic: 'Chauri Chaura Incident',
+      difficulty: 'easy',
+      question: 'Which violent incident in February 1922 compelled Mahatma Gandhi to immediately call off the Non-Cooperation Movement?',
+      options: [
+        'The burning of a police station by an agitated crowd at Chauri Chaura in Gorakhpur.',
+        'The armed raid on the Chittagong armoury led by Surya Sen.',
+        'The execution of Bhagat Singh, Sukhdev, and Rajguru in Lahore.',
+        'The police lathi charge on the Simon Commission demonstration in Lahore.'
+      ],
+      correctOption: 0,
+      explanation: 'At Chauri Chaura in Gorakhpur (UP), a peaceful demonstration turned into a violent clash where a police station was set on fire, killing 22 policemen. Hearing this, Mahatma Gandhi called off the Non-Cooperation Movement in February 1922.'
+    },
+    {
+      topic: 'Simon Commission Boycott',
+      difficulty: 'moderate',
+      question: 'Why was the Indian Statutory Commission (Simon Commission) greeted with black flags and the slogan "Go Back Simon" upon arriving in India in 1928?',
+      options: [
+        'It did not include a single Indian member among its commissioners.',
+        'It refused to negotiate trade treaties with Indian business merchants.',
+        'It was appointed specifically to dissolve the Indian National Congress.',
+        'It recommended shifting the national capital from Delhi back to Calcutta.'
+      ],
+      correctOption: 0,
+      explanation: 'The Simon Commission, appointed by the British Tory government under Sir John Simon to review the functioning of the constitutional system in India, was boycotted by all Indian parties because all of its members were British.'
+    },
+    {
+      topic: 'Poona Pact 1932',
+      difficulty: 'difficult',
+      question: 'What was the historic compromise agreed upon between Mahatma Gandhi and Dr. B.R. Ambedkar in the Poona Pact of September 1932?',
+      options: [
+        'Reserved seats for Depressed Classes in general provincial and central legislatures instead of separate electorates.',
+        'Establishment of completely separate sovereign electorates for Depressed Classes for thirty years.',
+        'Formation of an autonomous independent state for minority communities in western India.',
+        'Reservation of half of the British Executive Council seats exclusively for Dalit leaders.'
+      ],
+      correctOption: 0,
+      explanation: 'The Poona Pact of September 1932 resolved Gandhi and Ambedkar’s dispute over the British Communal Award by giving the Depressed Classes reserved seats in provincial and central legislative councils, to be voted on by the general electorate.'
+    },
+    {
+      topic: 'Lahore Congress Session 1929',
+      difficulty: 'moderate',
+      question: 'What historic resolution was formalized at the Lahore Congress Session of December 1929 under the presidency of Jawaharlal Nehru?',
+      options: [
+        'The formal demand for "Purna Swaraj" (complete independence) for India.',
+        'The formal acceptance of Dominion Status under the British Crown.',
+        'The launching of the Rowlatt Satyagraha nationwide.',
+        'The merging of the Swaraj Party with the Muslim League.'
+      ],
+      correctOption: 0,
+      explanation: 'In December 1929, under the presidency of Jawaharlal Nehru, the Lahore Congress formalized the demand of "Purna Swaraj" or complete independence and declared 26 January 1930 as Independence Day.'
+    }
+  ],
+
+  'The Rise of Nationalism in Europe': [
+    {
+      topic: 'Napoleonic Civil Code 1804',
+      difficulty: 'moderate',
+      question: 'Which of the following was a key reform introduced across French-controlled territories by the Napoleonic Code of 1804?',
+      options: [
+        'Abolition of all birth-based privileges, establishment of equality before law, and securing property rights.',
+        'Introduction of universal adult franchise including voting rights for all adult women.',
+        'Restoration of feudal dues, serfdom, and aristocratic guild restrictions.',
+        'Mandatory adoption of the Latin language for all state school curricula.'
+      ],
+      correctOption: 0,
+      explanation: 'The Civil Code of 1804 (Napoleonic Code) did away with all privileges based on birth, established equality before the law, secured the right to property, and abolished the feudal system across regions under French control.'
+    },
+    {
+      topic: 'Zollverein Customs Union',
+      difficulty: 'difficult',
+      question: 'In 1834, a customs union known as the "Zollverein" was initiated in German states under Prussian leadership to:',
+      options: [
+        'Abolish tariff barriers and reduce the number of regional currencies from over thirty to two.',
+        'Impose heavy naval blockades on British manufactured cotton imports.',
+        'Establish a unified Austrian military command over southern European borders.',
+        'Collect ecclesiastical taxes for the Papal States in Rome.'
+      ],
+      correctOption: 0,
+      explanation: 'The Zollverein customs union abolished internal tariff barriers and reduced currencies from over thirty to two, creating economic unity that strengthened national sentiment in Germany.'
+    },
+    {
+      topic: 'Unification of Germany',
+      difficulty: 'moderate',
+      question: 'Who was the chief minister of Prussia widely regarded as the architect of German unification carried out through the policy of "Blood and Iron"?',
+      options: [
+        'Otto von Bismarck',
+        'Giuseppe Garibaldi',
+        'Klemens von Metternich',
+        'Count Camillo de Cavour'
+      ],
+      correctOption: 0,
+      explanation: 'Otto von Bismarck, Chief Minister of Prussia, led the process of German unification using the Prussian army and bureaucracy through three wars over seven years with Austria, Denmark, and France.'
+    },
+    {
+      topic: 'National Allegories',
+      difficulty: 'easy',
+      question: 'In 19th-century Europe, which female allegory was depicted wearing a crown of oak leaves to represent German heroism?',
+      options: [
+        'Germania',
+        'Marianne',
+        'Britannia',
+        'Columbia'
+      ],
+      correctOption: 0,
+      explanation: 'Germania became the allegory of the German nation. In visual representations, Germania wears a crown of oak leaves, as the German oak stands for heroism.'
+    }
+  ],
+
+  'Resources and Development': [
+    {
+      topic: 'Black Soil Characteristics',
+      difficulty: 'easy',
+      question: 'Which type of Indian soil is typically black in color, clayey, develops deep cracks during hot weather, and is renowned for cotton cultivation?',
+      options: [
+        'Black Soil (Regur Soil)',
+        'Laterite Soil',
+        'Arid Soil',
+        'Red and Yellow Soil'
+      ],
+      correctOption: 0,
+      explanation: 'Black soil, also known as Regur soil, is formed from Deccan Trap basalt weathering, has high water-retentive clayey capacity, and is ideally suited for cotton cultivation.'
+    },
+    {
+      topic: 'Alluvial Soil Classification',
+      difficulty: 'moderate',
+      question: 'How do geographers differentiate between "Khadar" and "Bhangar" alluvial soils of the Northern Plains?',
+      options: [
+        'Khadar is newer, more fertile alluvium, while Bhangar is older alluvium containing higher Kanker nodules.',
+        'Khadar is found strictly on mountain hilltops, while Bhangar lines coastal beaches.',
+        'Khadar is completely barren clay, while Bhangar consists of desert sand dunes.',
+        'Khadar has an acidic pH below 4, while Bhangar is rich in volcanic iron ore.'
+      ],
+      correctOption: 0,
+      explanation: 'According to age, alluvial soils are classified into Bhangar (old alluvium, higher concentration of calcareous Kanker nodules) and Khadar (new alluvium, more fertile and fine-grained).'
+    },
+    {
+      topic: 'Land Degradation Causes',
+      difficulty: 'moderate',
+      question: 'What is the principal cause of severe land degradation observed in the states of Punjab, Haryana, and western Uttar Pradesh?',
+      options: [
+        'Over-irrigation leading to waterlogging, increased soil salinity, and alkalinity.',
+        'Excessive deforestation driven by opencast bauxite mining.',
+        'Severe overgrazing by nomadic livestock in arid pastures.',
+        'Heavy industrial toxic discharge from petroleum refineries.'
+      ],
+      correctOption: 0,
+      explanation: 'In Punjab, Haryana, and western UP, excessive canal and tubewell irrigation has resulted in waterlogging, increasing salinity and alkalinity in the soil.'
+    },
+    {
+      topic: 'Rio Earth Summit 1992',
+      difficulty: 'difficult',
+      question: 'What global action plan was adopted at the United Nations Conference on Environment and Development (UNCED) at Rio de Janeiro in 1992 to achieve global sustainable development?',
+      options: [
+        'Agenda 21',
+        'Kyoto Protocol',
+        'Paris Climate Accord',
+        'Montreal Protocol'
+      ],
+      correctOption: 0,
+      explanation: 'In June 1992, more than 100 heads of states met in Rio de Janeiro, Brazil, and endorsed the global Forest Principles and adopted Agenda 21 for achieving Sustainable Development in the 21st century.'
+    }
+  ],
+
+  'Power Sharing & Federalism': [
+    {
+      topic: 'Belgium Model of Power Sharing',
+      difficulty: 'moderate',
+      question: 'Which constitutional arrangement was adopted in Belgium to avoid ethnic conflict between Dutch-speaking and French-speaking communities?',
+      options: [
+        'Equal number of Dutch and French-speaking ministers in the Central Government with special majority protections.',
+        'Complete expulsion of minority French speakers from the capital city of Brussels.',
+        'Declaration of the Dutch language as the sole official language of the country.',
+        'Concentration of all executive power in a single hereditary monarch.'
+      ],
+      correctOption: 0,
+      explanation: 'The Belgian Constitution prescribes that the number of Dutch and French-speaking ministers shall be equal in the central government so no single community can make decisions unilaterally.'
+    },
+    {
+      topic: 'Horizontal vs Vertical Power Sharing',
+      difficulty: 'easy',
+      question: 'In a modern democracy, power sharing among the Legislature, Executive, and Judiciary is formally termed as:',
+      options: [
+        'Horizontal distribution of power (System of Checks and Balances)',
+        'Vertical division of federal power',
+        'Community power sharing mechanism',
+        'Authoritarian separation of functions'
+      ],
+      correctOption: 0,
+      explanation: 'Power shared among different organs of government placed at the same level—legislature, executive, and judiciary—is called horizontal distribution, allowing each organ to check the others.'
+    },
+    {
+      topic: 'Legislative Lists in Indian Constitution',
+      difficulty: 'moderate',
+      question: 'Under the Indian Constitution, subjects of common interest such as Education, Forests, and Trade Unions are placed in which list?',
+      options: [
+        'Concurrent List (both Union and State legislatures can make laws)',
+        'Union List (strictly Parliament only)',
+        'State List (strictly State legislatures only)',
+        'Residuary Powers List'
+      ],
+      correctOption: 0,
+      explanation: 'The Concurrent List includes subjects of common interest to both the Union and State governments, such as education, forest, trade unions, marriage, adoption, and succession.'
+    },
+    {
+      topic: '1992 Decentralization Amendment',
+      difficulty: 'difficult',
+      question: 'Which constitutional reform was made mandatory by the 73rd and 74th Constitutional Amendment Acts in India in 1992 to empower local government?',
+      options: [
+        'Mandatory regular local elections, reservation of at least 1/3rd seats for women, and state revenue sharing.',
+        'Abolition of all Gram Panchayats in favor of direct district magistrate rule.',
+        'Complete privatization of all rural irrigation and water bodies.',
+        'Nomination of all municipal corporators directly by the Central Union Cabinet.'
+      ],
+      correctOption: 0,
+      explanation: 'A major step toward decentralisation was taken in 1992 with the 73rd and 74th amendments, making regular elections mandatory, reserving at least one-third of all seats for women, and establishing State Election Commissions.'
+    }
+  ],
+
+  'Development, Sectors of Economy & Money and Credit': [
+    {
+      topic: 'Disguised Unemployment in Agriculture',
+      difficulty: 'moderate',
+      question: 'What is meant by "disguised unemployment" (underemployment) commonly prevalent in India\'s primary agricultural sector?',
+      options: [
+        'More workers are engaged on a farm than required; removing a few does not decrease total production.',
+        'Workers are actively employed only for two weeks during the monsoon and unemployed the rest of the year.',
+        'Educated university graduates are unable to find any employment in urban software parks.',
+        'Workers lose their jobs due to the sudden closure of a large textile mill.'
+      ],
+      correctOption: 0,
+      explanation: 'Disguised unemployment occurs when more people are working in an activity than required. Each person appears to work, but their marginal productivity is zero; withdrawing them leaves total agricultural output unchanged.'
+    },
+    {
+      topic: 'Formal vs Informal Credit Role of RBI',
+      difficulty: 'moderate',
+      question: 'Which apex institution strictly supervises the functioning of formal sources of loans (commercial banks) in India to ensure affordable credit reaches small borrowers?',
+      options: [
+        'Reserve Bank of India (RBI)',
+        'State Bank of India (SBI)',
+        'Ministry of Finance',
+        'NITI Aayog'
+      ],
+      correctOption: 0,
+      explanation: 'The Reserve Bank of India (RBI) supervises the functioning of formal sources of loans. It monitors that banks maintain cash balances and lend not just to profit-making businesses, but also to small cultivators and cottage industries.'
+    },
+    {
+      topic: 'World Bank Development Criteria',
+      difficulty: 'easy',
+      question: 'What criterion is used by the World Bank in its World Development Reports to classify countries as rich or low-income?',
+      options: [
+        'Per Capita Income (Average Income)',
+        'Infant Mortality Rate',
+        'Gross Enrolment Ratio in Secondary Schools',
+        'Total Gold Reserves held in the Central Treasury'
+      ],
+      correctOption: 0,
+      explanation: 'In World Development Reports brought out by the World Bank, per capita income (total national income divided by total population) is used in classifying countries.'
+    },
+    {
+      topic: 'MGNREGA 2005 Guarantee',
+      difficulty: 'easy',
+      question: 'How many days of guaranteed wage employment in a year are provided under the Mahatma Gandhi National Rural Employment Guarantee Act (MGNREGA 2005)?',
+      options: [
+        '100 days of guaranteed wage employment',
+        '50 days of guaranteed wage employment',
+        '200 days of guaranteed wage employment',
+        '365 days of guaranteed wage employment'
+      ],
+      correctOption: 0,
+      explanation: 'Under MGNREGA 2005, all those who are able to and are in need of work in rural areas are guaranteed 100 days of employment in a year by the government. If the government fails to provide it, it gives unemployment allowances.'
+    },
+    {
+      topic: 'Terms of Credit - Collateral',
+      difficulty: 'moderate',
+      question: 'In financial banking, an asset that a borrower owns (such as land, building, vehicle, or bank deposit) and pledges to a lender as a guarantee until the loan is repaid is termed as:',
+      options: [
+        'Collateral',
+        'Interest dividend',
+        'Demand draft',
+        'Promissory share'
+      ],
+      correctOption: 0,
+      explanation: 'Collateral is an asset that the borrower owns and uses as a guarantee to a lender until the loan is repaid. If the borrower fails to repay, the lender has the legal right to sell the asset to obtain payment.'
+    }
+  ],
+
+  // ================= COMPUTER SCIENCE / IT =================
+  'Introduction to Computer Applications': [
+    {
+      topic: 'Network Protocol - HTTP vs HTTPS',
+      difficulty: 'easy',
+      question: 'Which network protocol provides encrypted communication over computer networks using SSL/TLS security certificates on port 443?',
+      options: [
+        'HTTPS (HyperText Transfer Protocol Secure)',
+        'HTTP (HyperText Transfer Protocol)',
+        'FTP (File Transfer Protocol)',
+        'SMTP (Simple Mail Transfer Protocol)'
+      ],
+      correctOption: 0,
+      explanation: 'HTTPS encrypts data exchanged between web browser and web server using SSL/TLS certificates, preventing eavesdropping and tampering.'
+    },
+    {
+      topic: 'Cyber Ethics - Plagiarism Definition',
+      difficulty: 'easy',
+      question: 'The unethical act of presenting someone else’s work, code, or ideas as one’s own without giving proper attribution or credit is known as:',
+      options: [
+        'Plagiarism',
+        'Open-source licensing',
+        'Phishing',
+        'Data encryption'
+      ],
+      correctOption: 0,
+      explanation: 'Plagiarism is the practice of taking someone else’s work or ideas and passing them off as one’s own without citing the original source.'
+    },
+    {
+      topic: 'Cyber Security - Phishing Attack',
+      difficulty: 'moderate',
+      question: 'What type of fraudulent cyber attack involves sending deceptive emails or messages masquerading as a legitimate bank or institution to steal sensitive credentials?',
+      options: [
+        'Phishing',
+        'DDoS Attack',
+        'Trojan Horse',
+        'Spyware'
+      ],
+      correctOption: 0,
+      explanation: 'Phishing is a social engineering attack where attackers impersonate trustworthy entities to deceive victims into revealing sensitive information like login credentials and credit card numbers.'
+    },
+    {
+      topic: 'HTML Hyperlink Tag',
+      difficulty: 'easy',
+      question: 'In HTML, which element tag and attribute are used to create a hyperlink to another web page?',
+      options: [
+        '<a href="url">Link Text</a>',
+        '<link src="url">Link Text</link>',
+        '<href url="link">Link Text</href>',
+        '<anchor to="url">Link Text</anchor>'
+      ],
+      correctOption: 0,
+      explanation: 'The <a> (anchor) tag with the href (hypertext reference) attribute specifies the target URL of the link.'
+    },
+    {
+      topic: 'Python Mutable vs Immutable Data Types',
+      difficulty: 'moderate',
+      question: 'In Python programming, which of the following standard data types is MUTABLE (can be modified in-place after creation)?',
+      options: [
+        'List',
+        'Tuple',
+        'String',
+        'Integer'
+      ],
+      correctOption: 0,
+      explanation: 'Lists in Python are mutable, meaning their elements can be added, removed, or changed in-place. Tuples, strings, and integers are immutable.'
+    },
+    {
+      topic: 'DNS Function in Networking',
+      difficulty: 'difficult',
+      question: 'What is the primary role of the Domain Name System (DNS) in computer networking?',
+      options: [
+        'Translating human-readable domain names (like www.example.com) into numerical IP addresses.',
+        'Allocating physical MAC addresses to network interface cards in a local LAN.',
+        'Encrypting packet payloads traveling across international undersea cables.',
+        'Converting AC current into DC power inside computer power supply units.'
+      ],
+      correctOption: 0,
+      explanation: 'DNS serves as the internet’s phone book by mapping human-readable domain names (e.g. www.google.com) to machine-readable IP addresses (e.g. 142.250.190.46).'
+    }
+  ],
+
+  'Networking Basics & Cyber Ethics': [
+    {
+      topic: 'Network Topologies',
+      difficulty: 'moderate',
+      question: 'In which computer network topology are all client nodes directly connected to a single centralized device such as a hub or switch?',
+      options: [
+        'Star Topology',
+        'Bus Topology',
+        'Ring Topology',
+        'Mesh Topology'
+      ],
+      correctOption: 0,
+      explanation: 'In a Star topology, each device has a dedicated point-to-point link to a central controller (hub or switch). Failure of one node does not disrupt the network.'
+    },
+    {
+      topic: 'Open Source Software vs Proprietary',
+      difficulty: 'easy',
+      question: 'Which of the following describes Free and Open-Source Software (FOSS)?',
+      options: [
+        'Software whose source code is freely available for inspection, modification, and redistribution.',
+        'Commercial software whose source code is kept strictly private and legally protected.',
+        'Trial software that stops working after a thirty-day evaluation period.',
+        'Malicious software that secretly logs user keystrokes.'
+      ],
+      correctOption: 0,
+      explanation: 'Open-source software (such as Linux, Python, or LibreOffice) provides source code openly under licenses (like GPL or MIT) allowing inspection, modification, and redistribution.'
+    },
+    {
+      topic: 'Firewall Network Security',
+      difficulty: 'moderate',
+      question: 'What is the main function of a network Firewall in a computer system?',
+      options: [
+        'Monitoring and filtering incoming and outgoing network traffic based on predefined security rules.',
+        'Increasing broadband internet download speeds by compressing video streams.',
+        'Physically cooling server racks to prevent processor overheating.',
+        'Defragmenting magnetic hard drives to reclaim unallocated storage sectors.'
+      ],
+      correctOption: 0,
+      explanation: 'A firewall is a network security device that monitors and filters incoming and outgoing network traffic based on an organization’s previously established security policies.'
+    }
+  ],
+
+  'HTML & CSS Web Authoring': [
+    {
+      topic: 'HTML Table Structure',
+      difficulty: 'moderate',
+      question: 'In HTML tables, which tag is used to define a table header cell that renders text as bold and centered by default?',
+      options: [
+        '<th>',
+        '<td>',
+        '<tr>',
+        '<head>'
+      ],
+      correctOption: 0,
+      explanation: 'The <th> element defines a header cell in an HTML table, rendering text bold and horizontally centered by default.'
+    },
+    {
+      topic: 'CSS Box Model',
+      difficulty: 'moderate',
+      question: 'In the standard CSS Box Model, what is the space between the content boundary and the element border called?',
+      options: [
+        'Padding',
+        'Margin',
+        'Outline',
+        'Gutter'
+      ],
+      correctOption: 0,
+      explanation: 'Padding is the space between the content of the element and its border, whereas margin is the space outside the border.'
+    }
+  ],
+
+  'Python Computational Thinking & Data Logic': [
+    {
+      topic: 'Python Arithmetic Floor Division',
+      difficulty: 'easy',
+      question: 'What is the output of the Python expression: 17 // 4?',
+      options: [
+        '4',
+        '4.25',
+        '1',
+        '4.0'
+      ],
+      correctOption: 0,
+      explanation: 'The // operator performs floor division, discarding any fractional remainder and returning the integer quotient (17 // 4 = 4).'
+    },
+    {
+      topic: 'Python Loop Control Break',
+      difficulty: 'moderate',
+      question: 'In Python programming, which keyword is used to terminate a loop immediately and transfer execution to the statement following the loop?',
+      options: [
+        'break',
+        'continue',
+        'pass',
+        'exit'
+      ],
+      correctOption: 0,
+      explanation: 'The "break" statement in Python brings control out of the loop immediately, whereas "continue" skips only the current iteration.'
+    }
   ]
 };
 
@@ -1204,6 +1714,19 @@ export function findQuestionBankTemplates(chapterName: string): StaticQuestionTe
 
   // 2. Common aliases & partial matches
   const aliases: [RegExp, string][] = [
+    [/\bnationalism\s*in\s*india/i, 'Nationalism in India'],
+    [/\bnationalism.*europe|\brise\s*of\s*nationalism/i, 'The Rise of Nationalism in Europe'],
+    [/\bresource.*development/i, 'Resources and Development'],
+    [/\bpower\s*sharing/i, 'Power Sharing & Federalism'],
+    [/\bfederal/i, 'Power Sharing & Federalism'],
+    [/\bdevelopment.*sector|\bsector.*economy|\bmoney.*credit/i, 'Development, Sectors of Economy & Money and Credit'],
+    [/\bdevelopment\b/i, 'Development, Sectors of Economy & Money and Credit'],
+    [/\bsector/i, 'Development, Sectors of Economy & Money and Credit'],
+    [/\bmoney|\bcredit/i, 'Development, Sectors of Economy & Money and Credit'],
+    [/\bcomput.*applicat|\bintroduction\s*to\s*computer/i, 'Introduction to Computer Applications'],
+    [/\bnetwork|\bcyber/i, 'Networking Basics & Cyber Ethics'],
+    [/\bhtml|\bcss|\bweb/i, 'HTML & CSS Web Authoring'],
+    [/\bpython|\bdata\s*logic/i, 'Python Computational Thinking & Data Logic'],
     [/\bquadrat/i, 'Quadratic Equations'],
     [/\bintegrat/i, 'Integration'],
     [/\bcalculus\b/i, 'Integration'],
@@ -1272,40 +1795,17 @@ export function computeChapterQuestionAllocations(
     subjectMap.get(sub)!.push(ch);
   }
 
-  // 1. Allocate quotas per subject
+  // 1. Allocate quotas per subject: 12-13 questions per selected subject
   const subjectQuotas = new Map<SubjectType, number>();
   if (subjects.length === 1) {
     subjectQuotas.set(subjects[0], totalQuestions);
   } else {
-    let allocated = 0;
-    const remainders: { sub: SubjectType; rem: number }[] = [];
+    const basePerSub = Math.floor(totalQuestions / subjects.length);
+    let remainder = totalQuestions % subjects.length;
     for (const sub of subjects) {
-      const count = subjectMap.get(sub)!.length;
-      const raw = (count / n) * totalQuestions;
-      const base = Math.max(1, Math.floor(raw)); // Guarantee at least 1 question per selected subject
-      subjectQuotas.set(sub, base);
-      allocated += base;
-      remainders.push({ sub, rem: raw - Math.floor(raw) });
-    }
-
-    // Adjust subject quotas to match totalQuestions exactly
-    remainders.sort((a, b) => b.rem - a.rem);
-    let diff = totalQuestions - allocated;
-    let rIdx = 0;
-    while (diff !== 0 && remainders.length > 0) {
-      const sub = remainders[rIdx % remainders.length].sub;
-      if (diff > 0) {
-        subjectQuotas.set(sub, (subjectQuotas.get(sub) || 0) + 1);
-        diff--;
-      } else {
-        const cur = subjectQuotas.get(sub) || 1;
-        if (cur > 1) {
-          subjectQuotas.set(sub, cur - 1);
-          diff++;
-        }
-      }
-      rIdx++;
-      if (rIdx > 100) break; // Safety bound
+      const quota = basePerSub + (remainder > 0 ? 1 : 0);
+      subjectQuotas.set(sub, Math.max(1, quota));
+      if (remainder > 0) remainder--;
     }
   }
 
@@ -2438,7 +2938,560 @@ export function generateDomainAuthenticQuestion(
     ]);
   }
 
-  // 4. English / Humanities fallback
+  // 4. Specialized Social Science generation (History, Geography, Political Science/Civics, Economics)
+  const isSocialScience = subject === 'Social Science' ||
+    /social|history|geograph|politic|civic|econom/i.test(subject) ||
+    /nationalism|europe|india|resource|development|soil|power\s*sharing|federal|sector|money|credit|agriculture|forest|water|mineral|manufactur|globalis|democracy/i.test(`${chapter.chapterName} ${topic}`);
+
+  if (isSocialScience) {
+    const sstContext = `${chapter.chapterName} ${topic}`.toLowerCase();
+
+    // History - Nationalism in India & Europe
+    if (/india|nationalism|satyagraha|movement|khilafat|swaraj|rowlatt|simon|dandi|poona|europe|napoleon|bismarck/i.test(sstContext)) {
+      return pickFirstUnused([
+        () => ({
+          questionId: `q_${String(counter).padStart(3, '0')}`,
+          chapterId: chapter.chapterId,
+          chapterName: chapter.chapterName,
+          topic: 'Rowlatt Act 1919 Provisions',
+          difficulty: 'easy',
+          question: 'What was the primary repressive provision introduced by the Rowlatt Act passed by the Imperial Legislative Council in 1919?',
+          options: buildShuffledOptions(
+            'It permitted the detention of political prisoners without trial for up to two years.',
+            [
+              'It completely banned all vernacular newspapers and printing presses in British India.',
+              'It made military service compulsory for all Indian male college students.',
+              'It doubled land revenue taxes and seized private farmland in Punjab.'
+            ],
+            targetOptionIndex
+          ),
+          correctOption: targetOptionIndex,
+          explanation: 'The Rowlatt Act of 1919 gave the British government enormous powers to repress political activities and allowed detention of political prisoners without trial for up to two years.',
+          subject: 'Social Science' as SubjectType
+        }),
+        () => ({
+          questionId: `q_${String(counter).padStart(3, '0')}`,
+          chapterId: chapter.chapterId,
+          chapterName: chapter.chapterName,
+          topic: 'Jallianwala Bagh Massacre',
+          difficulty: 'moderate',
+          question: 'Why had a large peaceful crowd gathered in the enclosed ground of Jallianwala Bagh on 13 April 1919 before General Dyer opened fire?',
+          options: buildShuffledOptions(
+            'To attend the annual Baisakhi fair and peacefully protest the arrest of national leaders.',
+            [
+              'To violently storm the British municipal police headquarters in Amritsar.',
+              'To demand an immediate declaration of war against the Ottoman Empire.',
+              'To celebrate the successful repeal of the Inland Emigration Act.'
+            ],
+            targetOptionIndex
+          ),
+          correctOption: targetOptionIndex,
+          explanation: 'On 13 April 1919, a crowd gathered at Jallianwala Bagh in Amritsar—some to protest against the government repressive Rowlatt Act and arrests of Dr. Saifuddin Kitchlew and Dr. Satyapal, and others to attend the annual Baisakhi fair.',
+          subject: 'Social Science' as SubjectType
+        }),
+        () => ({
+          questionId: `q_${String(counter).padStart(3, '0')}`,
+          chapterId: chapter.chapterId,
+          chapterName: chapter.chapterName,
+          topic: 'Chauri Chaura Incident',
+          difficulty: 'easy',
+          question: 'Which violent incident in February 1922 compelled Mahatma Gandhi to immediately call off the Non-Cooperation Movement?',
+          options: buildShuffledOptions(
+            'The burning of a police station by an agitated crowd at Chauri Chaura in Gorakhpur.',
+            [
+              'The armed raid on the Chittagong armoury led by Surya Sen.',
+              'The execution of Bhagat Singh, Sukhdev, and Rajguru in Lahore.',
+              'The police lathi charge on the Simon Commission demonstration in Lahore.'
+            ],
+            targetOptionIndex
+          ),
+          correctOption: targetOptionIndex,
+          explanation: 'At Chauri Chaura in Gorakhpur (UP), a peaceful demonstration turned into a violent clash where a police station was set on fire, killing 22 policemen. Hearing this, Mahatma Gandhi called off the Non-Cooperation Movement in February 1922.',
+          subject: 'Social Science' as SubjectType
+        }),
+        () => ({
+          questionId: `q_${String(counter).padStart(3, '0')}`,
+          chapterId: chapter.chapterId,
+          chapterName: chapter.chapterName,
+          topic: 'Simon Commission Boycott',
+          difficulty: 'moderate',
+          question: 'Why was the Indian Statutory Commission (Simon Commission) greeted with the slogan "Go Back Simon" upon its arrival in India in 1928?',
+          options: buildShuffledOptions(
+            'It did not include a single Indian member among its commissioners.',
+            [
+              'It refused to negotiate trade treaties with Indian business merchants.',
+              'It was appointed specifically to dissolve the Indian National Congress.',
+              'It recommended shifting the national capital from Delhi back to Calcutta.'
+            ],
+            targetOptionIndex
+          ),
+          correctOption: targetOptionIndex,
+          explanation: 'The Simon Commission, appointed by the British Tory government under Sir John Simon to review the functioning of the constitutional system in India, was boycotted by all Indian parties because all of its members were British.',
+          subject: 'Social Science' as SubjectType
+        }),
+        () => ({
+          questionId: `q_${String(counter).padStart(3, '0')}`,
+          chapterId: chapter.chapterId,
+          chapterName: chapter.chapterName,
+          topic: 'Poona Pact 1932',
+          difficulty: 'difficult',
+          question: 'What was the historic compromise agreed upon between Mahatma Gandhi and Dr. B.R. Ambedkar in the Poona Pact of September 1932?',
+          options: buildShuffledOptions(
+            'Reserved seats for Depressed Classes in general provincial and central legislatures instead of separate electorates.',
+            [
+              'Establishment of completely separate sovereign electorates for Depressed Classes for thirty years.',
+              'Formation of an autonomous independent state for minority communities in western India.',
+              'Reservation of half of the British Executive Council seats exclusively for Dalit leaders.'
+            ],
+            targetOptionIndex
+          ),
+          correctOption: targetOptionIndex,
+          explanation: 'The Poona Pact of September 1932 resolved Gandhi and Ambedkar’s dispute over the British Communal Award by giving the Depressed Classes reserved seats in provincial and central legislative councils, to be voted on by the general electorate.',
+          subject: 'Social Science' as SubjectType
+        }),
+        () => ({
+          questionId: `q_${String(counter).padStart(3, '0')}`,
+          chapterId: chapter.chapterId,
+          chapterName: chapter.chapterName,
+          topic: 'Lahore Congress Session 1929',
+          difficulty: 'moderate',
+          question: 'What momentous resolution was formalized at the historic Lahore Congress Session of December 1929 under Jawaharlal Nehru’s presidency?',
+          options: buildShuffledOptions(
+            'The formal demand for "Purna Swaraj" (complete independence) for India.',
+            [
+              'The formal acceptance of Dominion Status under the British Crown.',
+              'The launching of the Rowlatt Satyagraha nationwide.',
+              'The merging of the Swaraj Party with the Muslim League.'
+            ],
+            targetOptionIndex
+          ),
+          correctOption: targetOptionIndex,
+          explanation: 'In December 1929, under the presidency of Jawaharlal Nehru, the Lahore Congress formalized the demand of "Purna Swaraj" or complete independence and declared 26 January 1930 as Independence Day.',
+          subject: 'Social Science' as SubjectType
+        }),
+        () => ({
+          questionId: `q_${String(counter).padStart(3, '0')}`,
+          chapterId: chapter.chapterId,
+          chapterName: chapter.chapterName,
+          topic: 'Napoleonic Civil Code 1804',
+          difficulty: 'moderate',
+          question: 'Which of the following was a key reform introduced across French-controlled territories by the Napoleonic Code of 1804?',
+          options: buildShuffledOptions(
+            'Abolition of all birth-based privileges, establishment of equality before law, and securing property rights.',
+            [
+              'Introduction of universal adult franchise including voting rights for all adult women.',
+              'Restoration of feudal dues, serfdom, and aristocratic guild restrictions.',
+              'Mandatory adoption of the Latin language for all state school curricula.'
+            ],
+            targetOptionIndex
+          ),
+          correctOption: targetOptionIndex,
+          explanation: 'The Civil Code of 1804 (Napoleonic Code) did away with all privileges based on birth, established equality before the law, secured the right to property, and abolished the feudal system across regions under French control.',
+          subject: 'Social Science' as SubjectType
+        }),
+        () => ({
+          questionId: `q_${String(counter).padStart(3, '0')}`,
+          chapterId: chapter.chapterId,
+          chapterName: chapter.chapterName,
+          topic: 'Zollverein Customs Union',
+          difficulty: 'difficult',
+          question: 'In 1834, a customs union known as the "Zollverein" was initiated in German states under Prussian leadership to:',
+          options: buildShuffledOptions(
+            'Abolish tariff barriers and reduce the number of regional currencies from over thirty to two.',
+            [
+              'Impose heavy naval blockades on British manufactured cotton imports.',
+              'Establish a unified Austrian military command over southern European borders.',
+              'Collect ecclesiastical taxes for the Papal States in Rome.'
+            ],
+            targetOptionIndex
+          ),
+          correctOption: targetOptionIndex,
+          explanation: 'The Zollverein customs union abolished internal tariff barriers and reduced currencies from over thirty to two, creating economic unity that strengthened national sentiment in Germany.',
+          subject: 'Social Science' as SubjectType
+        })
+      ]);
+    }
+
+    // Geography - Soils, Resources, Agriculture, Water
+    if (/soil|resource|agriculture|water|forest|mineral|environment|land|crop/i.test(sstContext)) {
+      return pickFirstUnused([
+        () => ({
+          questionId: `q_${String(counter).padStart(3, '0')}`,
+          chapterId: chapter.chapterId,
+          chapterName: chapter.chapterName,
+          topic: 'Black Soil Characteristics',
+          difficulty: 'easy',
+          question: 'Which type of Indian soil is typically black in color, clayey, develops deep cracks during hot weather, and is renowned for cotton cultivation?',
+          options: buildShuffledOptions(
+            'Black Soil (Regur Soil)',
+            ['Laterite Soil', 'Arid Soil', 'Red and Yellow Soil'],
+            targetOptionIndex
+          ),
+          correctOption: targetOptionIndex,
+          explanation: 'Black soil, also known as Regur soil, is formed from Deccan Trap basalt weathering, has high water-retentive clayey capacity, and is ideally suited for cotton cultivation.',
+          subject: 'Social Science' as SubjectType
+        }),
+        () => ({
+          questionId: `q_${String(counter).padStart(3, '0')}`,
+          chapterId: chapter.chapterId,
+          chapterName: chapter.chapterName,
+          topic: 'Alluvial Soil Classification',
+          difficulty: 'moderate',
+          question: 'How do geographers differentiate between "Khadar" and "Bhangar" alluvial soils of the Northern Plains?',
+          options: buildShuffledOptions(
+            'Khadar is newer, more fertile alluvium, while Bhangar is older alluvium containing higher Kanker nodules.',
+            [
+              'Khadar is found strictly on mountain hilltops, while Bhangar lines coastal beaches.',
+              'Khadar is completely barren clay, while Bhangar consists of desert sand dunes.',
+              'Khadar has an acidic pH below 4, while Bhangar is rich in volcanic iron ore.'
+            ],
+            targetOptionIndex
+          ),
+          correctOption: targetOptionIndex,
+          explanation: 'According to age, alluvial soils are classified into Bhangar (old alluvium, higher concentration of calcareous Kanker nodules) and Khadar (new alluvium, more fertile and fine-grained).',
+          subject: 'Social Science' as SubjectType
+        }),
+        () => ({
+          questionId: `q_${String(counter).padStart(3, '0')}`,
+          chapterId: chapter.chapterId,
+          chapterName: chapter.chapterName,
+          topic: 'Land Degradation Causes',
+          difficulty: 'moderate',
+          question: 'What is the principal cause of severe land degradation observed in the states of Punjab, Haryana, and western Uttar Pradesh?',
+          options: buildShuffledOptions(
+            'Over-irrigation leading to waterlogging, increased soil salinity, and alkalinity.',
+            [
+              'Excessive deforestation driven by opencast bauxite mining.',
+              'Severe overgrazing by nomadic livestock in arid pastures.',
+              'Heavy industrial toxic discharge from petroleum refineries.'
+            ],
+            targetOptionIndex
+          ),
+          correctOption: targetOptionIndex,
+          explanation: 'In Punjab, Haryana, and western UP, excessive canal and tubewell irrigation has resulted in waterlogging, increasing salinity and alkalinity in the soil.',
+          subject: 'Social Science' as SubjectType
+        }),
+        () => ({
+          questionId: `q_${String(counter).padStart(3, '0')}`,
+          chapterId: chapter.chapterId,
+          chapterName: chapter.chapterName,
+          topic: 'Rabi vs Kharif Crops',
+          difficulty: 'easy',
+          question: 'Which of the following sets of crops represents major "Rabi" crops sown in winter (October–December) and harvested in summer in India?',
+          options: buildShuffledOptions(
+            'Wheat, Barley, Peas, Gram, and Mustard',
+            [
+              'Paddy (Rice), Maize, Jowar, Bajra, and Cotton',
+              'Watermelon, Muskmelon, Cucumber, and Fodder crops',
+              'Rubber, Tea, Coffee, and Jute'
+            ],
+            targetOptionIndex
+          ),
+          correctOption: targetOptionIndex,
+          explanation: 'Rabi crops are sown in winter from October to December and harvested in summer from April to June. Important Rabi crops include wheat, barley, peas, gram, and mustard.',
+          subject: 'Social Science' as SubjectType
+        }),
+        () => ({
+          questionId: `q_${String(counter).padStart(3, '0')}`,
+          chapterId: chapter.chapterId,
+          chapterName: chapter.chapterName,
+          topic: 'Rio Earth Summit 1992',
+          difficulty: 'difficult',
+          question: 'What global action plan was adopted at the United Nations Conference on Environment and Development (UNCED) at Rio de Janeiro in 1992 to achieve global sustainable development?',
+          options: buildShuffledOptions(
+            'Agenda 21',
+            ['Kyoto Protocol', 'Paris Climate Accord', 'Montreal Protocol'],
+            targetOptionIndex
+          ),
+          correctOption: targetOptionIndex,
+          explanation: 'In June 1992, more than 100 heads of states met in Rio de Janeiro, Brazil, and endorsed the global Forest Principles and adopted Agenda 21 for achieving Sustainable Development in the 21st century.',
+          subject: 'Social Science' as SubjectType
+        })
+      ]);
+    }
+
+    // Civics / Political Science - Power Sharing & Federalism
+    if (/power|shar|federal|constitut|democra|decentral|panchayat|govern|elect/i.test(sstContext)) {
+      return pickFirstUnused([
+        () => ({
+          questionId: `q_${String(counter).padStart(3, '0')}`,
+          chapterId: chapter.chapterId,
+          chapterName: chapter.chapterName,
+          topic: 'Belgium Model of Power Sharing',
+          difficulty: 'moderate',
+          question: 'Which constitutional arrangement was adopted in Belgium to avoid ethnic conflict between Dutch-speaking and French-speaking communities?',
+          options: buildShuffledOptions(
+            'Equal number of Dutch and French-speaking ministers in the Central Government with special majority protections.',
+            [
+              'Complete expulsion of minority French speakers from the capital city of Brussels.',
+              'Declaration of the Dutch language as the sole official language of the country.',
+              'Concentration of all executive power in a single hereditary monarch.'
+            ],
+            targetOptionIndex
+          ),
+          correctOption: targetOptionIndex,
+          explanation: 'The Belgian Constitution prescribes that the number of Dutch and French-speaking ministers shall be equal in the central government so no single community can make decisions unilaterally.',
+          subject: 'Social Science' as SubjectType
+        }),
+        () => ({
+          questionId: `q_${String(counter).padStart(3, '0')}`,
+          chapterId: chapter.chapterId,
+          chapterName: chapter.chapterName,
+          topic: 'Horizontal vs Vertical Power Sharing',
+          difficulty: 'easy',
+          question: 'In a modern democracy, power sharing among the Legislature, Executive, and Judiciary is formally termed as:',
+          options: buildShuffledOptions(
+            'Horizontal distribution of power (System of Checks and Balances)',
+            [
+              'Vertical division of federal power',
+              'Community power sharing mechanism',
+              'Authoritarian separation of functions'
+            ],
+            targetOptionIndex
+          ),
+          correctOption: targetOptionIndex,
+          explanation: 'Power shared among different organs of government placed at the same level—legislature, executive, and judiciary—is called horizontal distribution, allowing each organ to check the others.',
+          subject: 'Social Science' as SubjectType
+        }),
+        () => ({
+          questionId: `q_${String(counter).padStart(3, '0')}`,
+          chapterId: chapter.chapterId,
+          chapterName: chapter.chapterName,
+          topic: 'Legislative Lists in Indian Constitution',
+          difficulty: 'moderate',
+          question: 'Under the Indian Constitution, subjects of common interest such as Education, Forests, and Trade Unions are placed in which list?',
+          options: buildShuffledOptions(
+            'Concurrent List (both Union and State legislatures can make laws)',
+            [
+              'Union List (strictly Parliament only)',
+              'State List (strictly State legislatures only)',
+              'Residuary Powers List'
+            ],
+            targetOptionIndex
+          ),
+          correctOption: targetOptionIndex,
+          explanation: 'The Concurrent List includes subjects of common interest to both the Union and State governments, such as education, forest, trade unions, marriage, adoption, and succession.',
+          subject: 'Social Science' as SubjectType
+        }),
+        () => ({
+          questionId: `q_${String(counter).padStart(3, '0')}`,
+          chapterId: chapter.chapterId,
+          chapterName: chapter.chapterName,
+          topic: '1992 Decentralization Amendment',
+          difficulty: 'difficult',
+          question: 'Which constitutional reform was made mandatory by the 73rd and 74th Constitutional Amendment Acts in India in 1992 to empower local government?',
+          options: buildShuffledOptions(
+            'Mandatory regular local elections, reservation of at least 1/3rd seats for women, and state revenue sharing.',
+            [
+              'Abolition of all Gram Panchayats in favor of direct district magistrate rule.',
+              'Complete privatization of all rural irrigation and water bodies.',
+              'Nomination of all municipal corporators directly by the Central Union Cabinet.'
+            ],
+            targetOptionIndex
+          ),
+          correctOption: targetOptionIndex,
+          explanation: 'A major step toward decentralisation was taken in 1992 with the 73rd and 74th amendments, making regular elections mandatory, reserving at least one-third of all seats for women, and establishing State Election Commissions.',
+          subject: 'Social Science' as SubjectType
+        })
+      ]);
+    }
+
+    // Economics - Development, Sectors of Economy, Money and Credit
+    return pickFirstUnused([
+      () => ({
+        questionId: `q_${String(counter).padStart(3, '0')}`,
+        chapterId: chapter.chapterId,
+        chapterName: chapter.chapterName,
+        topic: 'Disguised Unemployment in Agriculture',
+        difficulty: 'moderate',
+        question: 'What is meant by "disguised unemployment" (underemployment) commonly prevalent in India\'s primary agricultural sector?',
+        options: buildShuffledOptions(
+          'More workers are engaged on a farm than required; removing a few does not decrease total production.',
+          [
+            'Workers are actively employed only for two weeks during the monsoon and unemployed the rest of the year.',
+            'Educated university graduates are unable to find any employment in urban software parks.',
+            'Workers lose their jobs due to the sudden closure of a large textile mill.'
+          ],
+          targetOptionIndex
+        ),
+        correctOption: targetOptionIndex,
+        explanation: 'Disguised unemployment occurs when more people are working in an activity than required. Each person appears to work, but their marginal productivity is zero; withdrawing them leaves total agricultural output unchanged.',
+        subject: 'Social Science' as SubjectType
+      }),
+      () => ({
+        questionId: `q_${String(counter).padStart(3, '0')}`,
+        chapterId: chapter.chapterId,
+        chapterName: chapter.chapterName,
+        topic: 'Formal vs Informal Credit Role of RBI',
+        difficulty: 'moderate',
+        question: 'Which apex institution strictly supervises the functioning of formal sources of loans (commercial banks) in India to ensure affordable credit reaches small borrowers?',
+        options: buildShuffledOptions(
+          'Reserve Bank of India (RBI)',
+          ['State Bank of India (SBI)', 'Ministry of Finance', 'NITI Aayog'],
+          targetOptionIndex
+        ),
+        correctOption: targetOptionIndex,
+        explanation: 'The Reserve Bank of India (RBI) supervises the functioning of formal sources of loans. It monitors that banks maintain cash balances and lend not just to profit-making businesses, but also to small cultivators and cottage industries.',
+        subject: 'Social Science' as SubjectType
+      }),
+      () => ({
+        questionId: `q_${String(counter).padStart(3, '0')}`,
+        chapterId: chapter.chapterId,
+        chapterName: chapter.chapterName,
+        topic: 'World Bank Development Criteria',
+        difficulty: 'easy',
+        question: 'What criterion is used by the World Bank in its World Development Reports to classify countries as rich or low-income?',
+        options: buildShuffledOptions(
+          'Per Capita Income (Average Income)',
+          ['Infant Mortality Rate', 'Gross Enrolment Ratio in Secondary Schools', 'Total Gold Reserves held in the Central Treasury'],
+          targetOptionIndex
+        ),
+        correctOption: targetOptionIndex,
+        explanation: 'In World Development Reports brought out by the World Bank, per capita income (total national income divided by total population) is used in classifying countries.',
+        subject: 'Social Science' as SubjectType
+      }),
+      () => ({
+        questionId: `q_${String(counter).padStart(3, '0')}`,
+        chapterId: chapter.chapterId,
+        chapterName: chapter.chapterName,
+        topic: 'MGNREGA 2005 Guarantee',
+        difficulty: 'easy',
+        question: 'How many days of guaranteed wage employment in a year are provided under the Mahatma Gandhi National Rural Employment Guarantee Act (MGNREGA 2005)?',
+        options: buildShuffledOptions(
+          '100 days of guaranteed wage employment',
+          ['50 days of guaranteed wage employment', '200 days of guaranteed wage employment', '365 days of guaranteed wage employment'],
+          targetOptionIndex
+        ),
+        correctOption: targetOptionIndex,
+        explanation: 'Under MGNREGA 2005, all those who are able to and are in need of work in rural areas are guaranteed 100 days of employment in a year by the government. If the government fails to provide it, it gives unemployment allowances.',
+        subject: 'Social Science' as SubjectType
+      }),
+      () => ({
+        questionId: `q_${String(counter).padStart(3, '0')}`,
+        chapterId: chapter.chapterId,
+        chapterName: chapter.chapterName,
+        topic: 'Terms of Credit - Collateral',
+        difficulty: 'moderate',
+        question: 'In financial banking, an asset that a borrower owns (such as land, building, vehicle, or bank deposit) and pledges to a lender as a guarantee until the loan is repaid is termed as:',
+        options: buildShuffledOptions(
+          'Collateral',
+          ['Interest dividend', 'Demand draft', 'Promissory share'],
+          targetOptionIndex
+        ),
+        correctOption: targetOptionIndex,
+        explanation: 'Collateral is an asset that the borrower owns and uses as a guarantee to a lender until the loan is repaid. If the borrower fails to repay, the lender has the legal right to sell the asset to obtain payment.',
+        subject: 'Social Science' as SubjectType
+      })
+    ]);
+  }
+
+  // 5. Specialized Computer Science / IT generation
+  const isComputerScience = subject === 'Computer Science' ||
+    /comput|tech|network|cyber|html|python|software|it\b/i.test(subject) ||
+    /comput|network|cyber|html|python|internet|protocol|browser|hardware|coding|data/i.test(`${chapter.chapterName} ${topic}`);
+
+  if (isComputerScience) {
+    return pickFirstUnused([
+      () => ({
+        questionId: `q_${String(counter).padStart(3, '0')}`,
+        chapterId: chapter.chapterId,
+        chapterName: chapter.chapterName,
+        topic: 'Network Protocol - HTTP vs HTTPS',
+        difficulty: 'easy',
+        question: 'Which network protocol provides encrypted communication over computer networks using SSL/TLS security certificates on port 443?',
+        options: buildShuffledOptions(
+          'HTTPS (HyperText Transfer Protocol Secure)',
+          ['HTTP (HyperText Transfer Protocol)', 'FTP (File Transfer Protocol)', 'SMTP (Simple Mail Transfer Protocol)'],
+          targetOptionIndex
+        ),
+        correctOption: targetOptionIndex,
+        explanation: 'HTTPS encrypts data exchanged between web browser and web server using SSL/TLS certificates, preventing eavesdropping and tampering.',
+        subject: 'Computer Science' as SubjectType
+      }),
+      () => ({
+        questionId: `q_${String(counter).padStart(3, '0')}`,
+        chapterId: chapter.chapterId,
+        chapterName: chapter.chapterName,
+        topic: 'Cyber Ethics - Plagiarism Definition',
+        difficulty: 'easy',
+        question: 'The unethical act of presenting someone else’s work, code, or ideas as one’s own without giving proper attribution or credit is known as:',
+        options: buildShuffledOptions(
+          'Plagiarism',
+          ['Open-source licensing', 'Phishing', 'Data encryption'],
+          targetOptionIndex
+        ),
+        correctOption: targetOptionIndex,
+        explanation: 'Plagiarism is the practice of taking someone else’s work or ideas and passing them off as one’s own without citing the original source.',
+        subject: 'Computer Science' as SubjectType
+      }),
+      () => ({
+        questionId: `q_${String(counter).padStart(3, '0')}`,
+        chapterId: chapter.chapterId,
+        chapterName: chapter.chapterName,
+        topic: 'Cyber Security - Phishing Attack',
+        difficulty: 'moderate',
+        question: 'What type of fraudulent cyber attack involves sending deceptive emails or messages masquerading as a legitimate bank or institution to steal sensitive credentials?',
+        options: buildShuffledOptions(
+          'Phishing',
+          ['DDoS Attack', 'Trojan Horse', 'Spyware'],
+          targetOptionIndex
+        ),
+        correctOption: targetOptionIndex,
+        explanation: 'Phishing is a social engineering attack where attackers impersonate trustworthy entities to deceive victims into revealing sensitive information like login credentials and credit card numbers.',
+        subject: 'Computer Science' as SubjectType
+      }),
+      () => ({
+        questionId: `q_${String(counter).padStart(3, '0')}`,
+        chapterId: chapter.chapterId,
+        chapterName: chapter.chapterName,
+        topic: 'HTML Hyperlink Tag',
+        difficulty: 'easy',
+        question: 'In HTML, which element tag and attribute are used to create a hyperlink to another web page?',
+        options: buildShuffledOptions(
+          '<a href="url">Link Text</a>',
+          ['<link src="url">Link Text</link>', '<href url="link">Link Text</href>', '<anchor to="url">Link Text</anchor>'],
+          targetOptionIndex
+        ),
+        correctOption: targetOptionIndex,
+        explanation: 'The <a> (anchor) tag with the href (hypertext reference) attribute specifies the target URL of the link.',
+        subject: 'Computer Science' as SubjectType
+      }),
+      () => ({
+        questionId: `q_${String(counter).padStart(3, '0')}`,
+        chapterId: chapter.chapterId,
+        chapterName: chapter.chapterName,
+        topic: 'Python Mutable vs Immutable Data Types',
+        difficulty: 'moderate',
+        question: 'In Python programming, which of the following standard data types is MUTABLE (can be modified in-place after creation)?',
+        options: buildShuffledOptions(
+          'List',
+          ['Tuple', 'String', 'Integer'],
+          targetOptionIndex
+        ),
+        correctOption: targetOptionIndex,
+        explanation: 'Lists in Python are mutable, meaning their elements can be added, removed, or changed in-place. Tuples, strings, and integers are immutable.',
+        subject: 'Computer Science' as SubjectType
+      }),
+      () => ({
+        questionId: `q_${String(counter).padStart(3, '0')}`,
+        chapterId: chapter.chapterId,
+        chapterName: chapter.chapterName,
+        topic: 'DNS Function in Networking',
+        difficulty: 'difficult',
+        question: 'What is the primary role of the Domain Name System (DNS) in computer networking?',
+        options: buildShuffledOptions(
+          'Translating human-readable domain names (like www.example.com) into numerical IP addresses.',
+          ['Allocating physical MAC addresses to network interface cards in a local LAN.', 'Encrypting packet payloads traveling across international undersea cables.', 'Converting AC current into DC power inside computer power supply units.'],
+          targetOptionIndex
+        ),
+        correctOption: targetOptionIndex,
+        explanation: 'DNS serves as the internet’s phone book by mapping human-readable domain names (e.g. www.google.com) to machine-readable IP addresses (e.g. 142.250.190.46).',
+        subject: 'Computer Science' as SubjectType
+      })
+    ]);
+  }
+
+  // 6. English / Humanities fallback
   return pickFirstUnused([
     () => ({
       questionId: `q_${String(counter).padStart(3, '0')}`,
@@ -2504,16 +3557,16 @@ export function generateDomainAuthenticQuestion(
       questionId: `q_${String(counter).padStart(3, '0')}`,
       chapterId: chapter.chapterId,
       chapterName: chapter.chapterName,
-      topic: 'Literary Devices',
-      difficulty: 'easy',
-      question: `In literary analysis of "${chapter.chapterName}", which figure of speech attributes human qualities or feelings to non-human entities?`,
+      topic: 'Vocabulary in Context',
+      difficulty: 'moderate',
+      question: `In formal academic analysis of "${chapter.chapterName}", choose the word that most accurately replaces the phrase "show clearly and convincingly":`,
       options: buildShuffledOptions(
-        'Personification',
-        ['Metaphor', 'Hyperbole', 'Oxymoron'],
+        'Demonstrate',
+        ['Contemplate', 'Exaggerate', 'Procrastinate'],
         targetOptionIndex
       ),
       correctOption: targetOptionIndex,
-      explanation: 'Personification is a poetic device where non-human objects or abstractions are given human traits.',
+      explanation: '"Demonstrate" means to show clearly and deliberately by evidence or reasoning.',
       subject
     }),
     () => ({
@@ -2677,13 +3730,14 @@ export async function generateCombinedQuestions(
   chaptersBySubject: Record<SubjectType, ExtractedChapter[]>,
   selectedSubjects: SubjectType[],
   classLevel?: string,
-  targetTotalQuestions = TARGET_PRE_ASSESSMENT_QUESTIONS
+  targetTotalQuestions?: number
 ): Promise<{
   questions: PreAssessmentQuestion[];
   isDemoMode: boolean;
   allocations: ChapterQuestionAllocation[];
   allowedMap: AllowedContentMap;
 }> {
+  const effectiveTarget = targetTotalQuestions || getTargetQuestionsForSubjects(selectedSubjects);
   // 1. Build the strict Allowed Content Map
   const allowedMap = buildAllowedContentMap(selectedSubjects, chaptersBySubject);
   const allChapters = allowedMap.allowedChapters;
@@ -2701,7 +3755,7 @@ export async function generateCombinedQuestions(
   let isDemoMode = false;
 
   // 2. Compute exact question allocation across verified chapters and difficulty levels
-  const allocations = computeChapterQuestionAllocations(allChapters, targetTotalQuestions);
+  const allocations = computeChapterQuestionAllocations(allChapters, effectiveTarget);
 
   // 3. Attempt Gemini Generation via server endpoint if available (browser only)
   if (typeof window !== 'undefined') {
@@ -2720,7 +3774,7 @@ export async function generateCombinedQuestions(
           subject: selectedSubjects.join(' & '),
           classLevel,
           chapterAllocations: allocations,
-          targetTotalQuestions,
+          targetTotalQuestions: effectiveTarget,
           apiKey
         })
       });
@@ -2754,8 +3808,8 @@ export async function generateCombinedQuestions(
             }
           });
 
-          if (validated.length >= Math.min(24, targetTotalQuestions)) {
-            generatedQuestions = validated.slice(0, targetTotalQuestions);
+          if (validated.length >= Math.min(24, effectiveTarget)) {
+            generatedQuestions = validated.slice(0, effectiveTarget);
             isDemoMode = false;
           }
         }
@@ -2767,7 +3821,7 @@ export async function generateCombinedQuestions(
   }
 
   // 4. Curriculum Question Bank + Grounded Content Slices
-  if (generatedQuestions.length < targetTotalQuestions) {
+  if (generatedQuestions.length < effectiveTarget) {
     isDemoMode = true;
     const usedStems = new Set<string>();
     generatedQuestions.forEach(q => usedStems.add(q.question.trim().toLowerCase()));
@@ -2865,7 +3919,7 @@ export async function generateCombinedQuestions(
 
     // 4b. Filler loop to ensure exact quota if any slots were somehow missed
     let fillAttempt = 0;
-    while (generatedQuestions.length < targetTotalQuestions && fillAttempt < 60) {
+    while (generatedQuestions.length < effectiveTarget && fillAttempt < 60) {
       const chapter = allChapters[fillAttempt % allChapters.length];
       const topic = chapter.topics && chapter.topics.length > 0
         ? chapter.topics[fillAttempt % chapter.topics.length]
@@ -2907,7 +3961,7 @@ export async function generateCombinedQuestions(
   const interleaved: PreAssessmentQuestion[] = [];
   let hasMore = true;
   let cursor = 0;
-  while (hasMore && interleaved.length < targetTotalQuestions) {
+  while (hasMore && interleaved.length < effectiveTarget) {
     hasMore = false;
     for (const sub of selectedSubjects) {
       const list = groupedBySubject[sub] || [];
@@ -2919,18 +3973,18 @@ export async function generateCombinedQuestions(
     cursor++;
   }
 
-  // If interleaved somehow has fewer than targetTotalQuestions, fill from generatedQuestions
-  if (interleaved.length < targetTotalQuestions) {
+  // If interleaved somehow has fewer than effectiveTarget, fill from generatedQuestions
+  if (interleaved.length < effectiveTarget) {
     for (const q of generatedQuestions) {
       if (!interleaved.some(existing => existing.questionId === q.questionId)) {
         interleaved.push(q);
-        if (interleaved.length >= targetTotalQuestions) break;
+        if (interleaved.length >= effectiveTarget) break;
       }
     }
   }
 
   // Ensure exact question count
-  const finalQuestions = interleaved.slice(0, targetTotalQuestions).map((q, idx) => ({
+  const finalQuestions = interleaved.slice(0, effectiveTarget).map((q, idx) => ({
     ...q,
     questionId: `q_${String(idx + 1).padStart(3, '0')}`
   }));

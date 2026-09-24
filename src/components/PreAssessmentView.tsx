@@ -35,6 +35,7 @@ import {
   validateAssessmentSession,
   ChapterQuestionAllocation,
   TARGET_PRE_ASSESSMENT_QUESTIONS,
+  getTargetQuestionsForSubjects,
   getStoredGeminiKey
 } from '../services/preAssessmentService';
 import {
@@ -294,6 +295,7 @@ export const PreAssessmentView: React.FC = () => {
     setLoadingMessage(`Verifying chapters and building diagnostic assessment strictly for [${selectedSubjects.join(' & ')}]...`);
 
     try {
+      const targetCount = getTargetQuestionsForSubjects(selectedSubjects);
       const {
         questions: genQuestions,
         isDemoMode: qDemoFlag,
@@ -303,11 +305,11 @@ export const PreAssessmentView: React.FC = () => {
         filteredChaptersBySubject,
         selectedSubjects,
         student.grade,
-        TARGET_PRE_ASSESSMENT_QUESTIONS
+        targetCount
       );
 
       // Validate session against strict boundary rules
-      const sessionCheck = validateAssessmentSession(genQuestions, allowedMap, TARGET_PRE_ASSESSMENT_QUESTIONS);
+      const sessionCheck = validateAssessmentSession(genQuestions, allowedMap, targetCount);
       if (!sessionCheck.valid) {
         console.warn('Assessment validation warnings:', sessionCheck.reasons);
       }
@@ -586,7 +588,7 @@ export const PreAssessmentView: React.FC = () => {
               }}
             >
               {isExtractingChapters ? <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} /> : <Sparkles size={18} />}
-              <span>Start Diagnostic ({TARGET_PRE_ASSESSMENT_QUESTIONS} Qs)</span>
+              <span>Start Diagnostic ({getTargetQuestionsForSubjects(selectedSubjects)} Qs)</span>
               <ArrowRight size={18} />
             </button>
 
@@ -852,7 +854,7 @@ export const PreAssessmentView: React.FC = () => {
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: '0.84rem', color: '#475569' }}>
               <span>Subjects: <strong>{selectedSubjects.length}</strong></span>
               <span>Chapters: <strong>{totalActiveChapters}</strong></span>
-              <span>Questions: <strong>{TARGET_PRE_ASSESSMENT_QUESTIONS}</strong></span>
+              <span>Questions: <strong>{getTargetQuestionsForSubjects(selectedSubjects)}</strong></span>
             </div>
 
             <button

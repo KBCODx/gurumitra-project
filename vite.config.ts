@@ -1,5 +1,6 @@
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
+import { buildSubjectCurriculumLesson } from './src/services/curriculumKnowledgePacks';
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
@@ -36,6 +37,10 @@ export default defineConfig(({ mode }) => {
                 });
                 req.on('error', reject);
               });
+            };
+
+            const createServerCurriculumLessonFallback = (params: any) => {
+              return buildSubjectCurriculumLesson(params);
             };
 
             try {
@@ -480,6 +485,680 @@ Return ONLY a valid JSON object matching this schema:
                 const rawJson = result?.candidates?.[0]?.content?.parts?.[0]?.text;
                 const parsed = rawJson ? JSON.parse(rawJson) : null;
                 return sendJson(200, { isDemoMode: false, data: parsed });
+              }
+
+              // Endpoint: /api/ai/analyze-syllabus
+              if (req.url === '/api/ai/analyze-syllabus' && req.method === 'POST') {
+                const body = await readBody();
+                const effectiveApiKey = clientHeaderApiKey || body.apiKey || geminiApiKey;
+                const effectiveModel = body.model || geminiModel || 'gemini-1.5-flash';
+
+                if (!effectiveApiKey) {
+                  return sendJson(200, {
+                    isDemoMode: true,
+                    message: 'GEMINI_API_KEY not configured. Running in Demo Mode.'
+                  });
+                }
+
+                const { subject, chaptersSummary } = body;
+
+                const prompt = `You are GuruMitra's Curriculum Pedagogical Advisor.
+Analyze this grounded syllabus & assessment mastery mapping for ${subject}:
+${JSON.stringify(chaptersSummary, null, 2)}
+
+Provide pedagogical synthesis:
+1. Identify high priority gaps that need immediate reinforcement.
+2. Highlight areas of solid command.
+3. Suggest clear actionable learning priorities.
+
+CRITICAL CONSTRAINT: Do NOT invent or alter any test scores or mastery percentages.
+Return ONLY a valid JSON object matching:
+{
+  "aiPedagogicalSummary": {
+    "strengths": ["chapter/topic where student is strong"],
+    "gaps": ["chapter/topic needing attention"],
+    "immediatePriorities": ["1-3 prioritized action step strings"]
+  }
+}`;
+
+                const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${effectiveModel}:generateContent?key=${effectiveApiKey}`;
+                const apiRes = await fetch(geminiUrl, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+                    generationConfig: {
+                      responseMimeType: 'application/json',
+                      temperature: 0.3
+                    }
+                  })
+                });
+
+                if (!apiRes.ok) {
+                  return sendJson(200, { isDemoMode: true });
+                }
+
+                const result = await apiRes.json();
+                const rawJson = result?.candidates?.[0]?.content?.parts?.[0]?.text;
+                const parsed = rawJson ? JSON.parse(rawJson) : null;
+                return sendJson(200, { isDemoMode: false, data: parsed });
+              }
+
+              // Endpoint: /api/ai/study-plan/generate
+              if (req.url === '/api/ai/study-plan/generate' && req.method === 'POST') {
+                const body = await readBody();
+                const effectiveApiKey = clientHeaderApiKey || body.apiKey || geminiApiKey;
+
+                const {
+                  student,
+                  examDate,
+                  selectedSubjects,
+                  selectedCurriculum,
+                  preAssessmentResult,
+                  dailyMinutesBudget = 140,
+                  curriculumVersionId = 'cbse-10-2026-27',
+                  startDate
+                } = body;
+
+                if (!examDate || !selectedSubjects || !selectedCurriculum) {
+                  return sendJson(400, { error: 'Missing required parameters for study plan generation.' });
+                }
+
+                // Calculate calendar & metrics deterministically
+                const start = startDate ? new Date(startDate) : new Date();
+                start.setHours(0, 0, 0, 0);
+                const exam = new Date(examDate);
+                exam.setHours(0, 0, 0, 0);
+
+                const diffMs = exam.getTime() - start.getTime();
+                const remainingDays = Math.max(1, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
+                let hasBufferConflict = false;
+                let bufferDays = 7;
+                let conflictMessage = '';
+
+                if (remainingDays <= 7) {
+                  hasBufferConflict = true;
+                  bufferDays = Math.max(1, Math.floor(remainingDays * 0.3));
+                  conflictMessage = `Exam is in ${remainingDays} days. The 7-day revision buffer has been compressed to ${bufferDays} day(s).`;
+                }
+
+                const targetCompletion = new Date(exam);
+                targetCompletion.setDate(targetCompletion.getDate() - bufferDays);
+
+                // Build daily plan objects
+                const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                const dailyPlans: any[] = [];
+                const cur = new Date(start);
+
+                // Collect all topics with performance weighting
+                const topicPool: any[] = [];
+                selectedCurriculum.forEach((c: any) => {
+                  const subName = c.subject;
+                  let subAcc = 65;
+                  if (preAssessmentResult?.subjectPerformance?.[subName]) {
+                    subAcc = preAssessmentResult.subjectPerformance[subName].percentage;
+                  }
+                  (c.chapters || []).forEach((ch: any) => {
+                    let chAcc = subAcc;
+                    if (preAssessmentResult?.chapterPerformance?.[ch.chapterName]) {
+                      chAcc = preAssessmentResult.chapterPerformance[ch.chapterName].accuracy;
+                    }
+                    const tops = ch.topics && ch.topics.length > 0 ? ch.topics : [ch.chapterName];
+                    tops.forEach((top: string) => {
+                      const isWeak = chAcc < 60;
+                      topicPool.push({
+                        subject: subName,
+                        chapterName: ch.chapterName,
+                        topicName: top,
+                        accuracy: chAcc,
+                        isWeak,
+                        durationMinutes: isWeak ? 75 : 45
+                      });
+                    });
+                  });
+                });
+
+                const topicsBySub: Record<string, any[]> = {};
+                selectedSubjects.forEach((sub: string) => {
+                  topicsBySub[sub] = topicPool.filter((t: any) => t.subject === sub);
+                });
+                const subPointers: Record<string, number> = {};
+                selectedSubjects.forEach((sub: string) => {
+                  subPointers[sub] = 0;
+                });
+                let studyDayCount = 0;
+                let tCount = 1;
+
+                while (cur <= exam) {
+                  const dateStr = cur.toISOString().split('T')[0];
+                  const dayName = daysOfWeek[cur.getDay()];
+                  const isSunday = cur.getDay() === 0;
+                  const isBuffer = cur > targetCompletion;
+
+                  if (isSunday) {
+                    dailyPlans.push({
+                      date: dateStr,
+                      day: dayName,
+                      dayOfWeek: dayName,
+                      isRestDay: true,
+                      restDayNote: 'Rest & Recovery. Optional: flashcards, light review, or catching up on missed tasks.',
+                      tasks: [],
+                      totalStudyMinutes: 0
+                    });
+                  } else if (isBuffer) {
+                    const tasks = selectedSubjects.map((sub: string, sIdx: number) => ({
+                      id: `task_rev_${dateStr}_${sIdx + 1}`,
+                      subject: sub,
+                      chapter: 'Exam Preparation & Comprehensive Revision',
+                      topic: 'Full Mock Test & Mistake Analysis',
+                      activity: 'Weekly Test',
+                      durationMinutes: Math.round(dailyMinutesBudget / selectedSubjects.length),
+                      completed: false,
+                      isRevision: true
+                    }));
+                    dailyPlans.push({
+                      date: dateStr,
+                      day: dayName,
+                      dayOfWeek: dayName,
+                      isRestDay: false,
+                      isRevisionPeriod: true,
+                      tasks,
+                      totalStudyMinutes: dailyMinutesBudget
+                    });
+                  } else {
+                    const tasks: any[] = [];
+                    let dayMins = 0;
+                    const targetSubCount = Math.min(3, selectedSubjects.length);
+                    const todaysSubjects: string[] = [];
+
+                    for (let s = 0; s < targetSubCount; s++) {
+                      todaysSubjects.push(selectedSubjects[(studyDayCount + s) % selectedSubjects.length]);
+                    }
+                    studyDayCount++;
+
+                    const baseDuration = Math.max(20, Math.floor(dailyMinutesBudget / targetSubCount));
+
+                    todaysSubjects.forEach((sub, sIdx) => {
+                      const poolForSub = topicsBySub[sub] || [];
+                      const pIdx = subPointers[sub] || 0;
+                      const isExhausted = pIdx >= poolForSub.length;
+                      const top = !isExhausted ? poolForSub[pIdx] : (poolForSub[studyDayCount % Math.max(1, poolForSub.length)] || {
+                        subject: sub,
+                        chapterName: `${sub} Core Review`,
+                        topicName: 'Comprehensive Topic Review & Problem Solving',
+                        isWeak: false
+                      });
+
+                      if (!isExhausted) {
+                        subPointers[sub] = pIdx + 1;
+                      }
+
+                      const duration = sIdx === todaysSubjects.length - 1
+                        ? Math.max(20, dailyMinutesBudget - dayMins)
+                        : baseDuration;
+
+                      tasks.push({
+                        id: `task_${dateStr}_${tCount++}`,
+                        subject: top.subject,
+                        chapter: top.chapterName,
+                        topic: top.topicName,
+                        activity: isExhausted ? 'Revision' : (top.isWeak ? 'Learn + Practice' : 'Practice'),
+                        durationMinutes: duration,
+                        completed: false,
+                        isWeakTopic: top.isWeak,
+                        isRevision: isExhausted
+                      });
+                      dayMins += duration;
+                    });
+
+                    dailyPlans.push({
+                      date: dateStr,
+                      day: dayName,
+                      dayOfWeek: dayName,
+                      isRestDay: false,
+                      tasks,
+                      totalStudyMinutes: dayMins
+                    });
+                  }
+                  cur.setDate(cur.getDate() + 1);
+                }
+
+                const planId = `plan_${student?.id || 'guest'}_${Date.now()}`;
+                const plan = {
+                  id: planId,
+                  studentId: student?.id || 'guest',
+                  curriculumVersionId,
+                  academicYear: student?.academicYear || '2026-27',
+                  classLevel: student?.grade || '10',
+                  board: student?.board || 'CBSE',
+                  examDate: exam.toISOString().split('T')[0],
+                  targetCompletionDate: targetCompletion.toISOString().split('T')[0],
+                  syllabusCompletionTarget: targetCompletion.toISOString().split('T')[0],
+                  daysAvailable: remainingDays,
+                  dailyMinutesBudget,
+                  selectedSubjects,
+                  selectedChapters: selectedCurriculum.reduce((acc: any, c: any) => {
+                    acc[c.subject] = (c.chapters || []).map((ch: any) => ch.chapterName);
+                    return acc;
+                  }, {}),
+                  dailyPlans,
+                  hasBufferConflict,
+                  conflictMessage: hasBufferConflict ? conflictMessage : undefined,
+                  performanceSnapshot: {},
+                  createdAt: new Date().toISOString(),
+                  updatedAt: new Date().toISOString()
+                };
+
+                return sendJson(200, {
+                  isDemoMode: !effectiveApiKey,
+                  plan
+                });
+              }
+
+              // Endpoint: /api/ai/weekly-test/generate
+              if (req.url === '/api/ai/weekly-test/generate' && req.method === 'POST') {
+                const body = await readBody();
+                const effectiveApiKey = clientHeaderApiKey || body.apiKey || geminiApiKey;
+                const effectiveModel = body.model || geminiModel || 'gemini-1.5-flash';
+
+                const {
+                  studentId = 'guest',
+                  weekNumber = 1,
+                  subject = 'Mathematics',
+                  topicsStudied = [],
+                  weakTopics = [],
+                  targetCount = 10
+                } = body;
+
+                let questions: any[] = [];
+                let isDemo = true;
+
+                if (effectiveApiKey) {
+                  try {
+                    const prompt = `You are a CBSE/ICSE exam question author.
+Generate a Weekly Test for subject "${subject}" (Week ${weekNumber}).
+Total questions: ${targetCount}.
+Topics studied this week: ${JSON.stringify(topicsStudied)}
+Weak topics needing reinforcement: ${JSON.stringify(weakTopics)}
+
+STRICT REQUIREMENTS:
+- Every question must test only topics studied this week or weak topics listed above.
+- Exactly 4 distinct options per question.
+- Exactly one correct answer (0-based integer index 0, 1, 2, or 3).
+- Provide a clear explanation for each answer.
+
+Return ONLY a valid JSON object matching:
+{
+  "questions": [
+    {
+      "id": "wt_q_1",
+      "subject": "${subject}",
+      "chapter": "Chapter name",
+      "topic": "Topic name",
+      "difficulty": "moderate",
+      "question": "Question text...",
+      "options": ["A", "B", "C", "D"],
+      "correctOption": 0,
+      "explanation": "Explanation..."
+    }
+  ]
+}`;
+
+                    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${effectiveModel}:generateContent?key=${effectiveApiKey}`;
+                    const apiRes = await fetch(geminiUrl, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+                        generationConfig: {
+                          responseMimeType: 'application/json',
+                          temperature: 0.3
+                        }
+                      })
+                    });
+
+                    if (apiRes.ok) {
+                      const resJson = await apiRes.json();
+                      const raw = resJson?.candidates?.[0]?.content?.parts?.[0]?.text;
+                      const parsed = raw ? JSON.parse(raw) : null;
+                      if (Array.isArray(parsed?.questions) && parsed.questions.length > 0) {
+                        questions = parsed.questions;
+                        isDemo = false;
+                      }
+                    }
+                  } catch (e) {
+                    console.warn('Gemini weekly test generation failed, using mock bank:', e);
+                  }
+                }
+
+                if (questions.length === 0) {
+                  const pool = topicsStudied.length > 0 ? topicsStudied : ['Core Concepts'];
+                  for (let i = 0; i < targetCount; i++) {
+                    const t = pool[i % pool.length];
+                    const correctIdx = (i * 2 + 1) % 4;
+                    questions.push({
+                      id: `wt_q_${i + 1}`,
+                      subject,
+                      chapter: t,
+                      topic: t,
+                      difficulty: i % 3 === 0 ? 'easy' : i % 3 === 1 ? 'moderate' : 'difficult',
+                      question: `In ${subject}, which statement correctly applies the core theorems of ${t}?`,
+                      options: [
+                        `It defines the authoritative rule governing ${t} as established in standard curriculum.`,
+                        `It applies exclusively to null values and cannot be evaluated.`,
+                        `It violates fundamental conservation laws established for this topic.`,
+                        `It is undefined across all real number coordinates.`
+                      ],
+                      correctOption: correctIdx,
+                      explanation: `Based on standard curriculum principles, ${t} satisfies the conditions given in option ${correctIdx + 1}.`
+                    });
+                  }
+                }
+
+                return sendJson(200, {
+                  isDemoMode: isDemo,
+                  test: {
+                    id: `test_${subject.toLowerCase()}_w${weekNumber}_${Date.now()}`,
+                    studentId,
+                    weekNumber,
+                    subject,
+                    totalQuestions: questions.length,
+                    topicsStudied,
+                    weakTopics
+                  },
+                  questions
+                });
+              }
+
+              // Endpoint: /api/ai/study-plan/adapt
+              if (req.url === '/api/ai/study-plan/adapt' && req.method === 'POST') {
+                const body = await readBody();
+                const { currentPlan, weeklyTestResult } = body;
+
+                if (!currentPlan || !weeklyTestResult) {
+                  return sendJson(400, { error: 'Missing currentPlan or weeklyTestResult for adaptation.' });
+                }
+
+                const adaptationsSummary: string[] = [];
+                const updatedPlans = [...currentPlan.dailyPlans];
+                const weakTopics = weeklyTestResult.weakTopics || [];
+                const strongTopics = weeklyTestResult.strongTopics || [];
+
+                if (weakTopics.length > 0) {
+                  adaptationsSummary.push(
+                    `Scheduled Sunday remedial reinforcement for ${weakTopics.length} weak topic(s): ${weakTopics.slice(0, 3).join(', ')}.`
+                  );
+                  let injected = 0;
+                  updatedPlans.forEach(day => {
+                    const isSun = day.day === 'Sunday' || day.isRestDay;
+                    if (isSun && !day.isCompleted && injected < weakTopics.length) {
+                      const topicName = weakTopics[injected % weakTopics.length];
+                      day.tasks.push({
+                        id: `task_remedial_sun_${Date.now()}_${injected}`,
+                        subject: currentPlan.selectedSubjects?.[0] || 'Remedial Reinforcement',
+                        chapter: 'Remedial Reinforcement',
+                        topic: topicName,
+                        durationMinutes: 35,
+                        activity: 'Remedial Review',
+                        completed: false,
+                        priority: 'High Priority',
+                        isWeakTopic: true
+                      });
+                      day.totalStudyMinutes += 35;
+                      day.restDayNote = 'Sunday Remedial Reinforcement: Focused catch-up session scheduled on Sunday so weekday study remains balanced.';
+                      injected++;
+                    }
+                  });
+                }
+
+                if (strongTopics.length > 0) {
+                  adaptationsSummary.push(
+                    `Streamlined mastered topics into rapid revision: ${strongTopics.slice(0, 2).join(', ')}.`
+                  );
+                  updatedPlans.forEach(day => {
+                    if (!day.isRestDay && !day.isCompleted) {
+                      day.tasks = day.tasks.map((t: any) => {
+                        if (strongTopics.some((s: string) => t.topic.toLowerCase().includes(s.toLowerCase()))) {
+                          return {
+                            ...t,
+                            durationMinutes: Math.max(30, t.durationMinutes - 15),
+                            activity: 'Revision',
+                            isWeakTopic: false
+                          };
+                        }
+                        return t;
+                      });
+                    }
+                  });
+                }
+
+                const adaptedPlan = {
+                  ...currentPlan,
+                  dailyPlans: updatedPlans,
+                  updatedAt: new Date().toISOString()
+                };
+
+                return sendJson(200, {
+                  isDemoMode: false,
+                  adaptedPlan,
+                  adaptationsSummary
+                });
+              }
+
+              // Endpoint: /api/ai/adaptive-lesson/generate
+              if (req.url === '/api/ai/adaptive-lesson/generate' && req.method === 'POST') {
+                const body = await readBody();
+                const clientHeaderApiKey = (req.headers['x-gemini-api-key'] as string) || (req.headers.authorization && (req.headers.authorization as string).replace(/^Bearer\s+/i, '')) || '';
+                const effectiveApiKey = clientHeaderApiKey || body.apiKey || geminiApiKey;
+                const effectiveModel = body.model || geminiModel || 'gemini-1.5-flash';
+
+                const {
+                  classLevel = '10th',
+                  board = 'CBSE',
+                  subject = 'Mathematics',
+                  chapter = 'Quadratic Equations',
+                  topic = 'Nature of Roots',
+                  subtopics = [],
+                  allocatedMinutes = 45,
+                  studentLevel = 'Average',
+                  learningStyle = 'Simple'
+                } = body;
+
+                let generatedLesson: any = null;
+                let isDemo = true;
+
+                if (effectiveApiKey) {
+                  try {
+                    const prompt = `You are GuruMitra's AI Adaptive Tutor and Pedagogical Curriculum Specialist for Class ${classLevel} (${board}).
+Generate an in-depth, curriculum-aligned, personalized adaptive learning session.
+
+STUDENT & TOPIC CONTEXT:
+- Board & Class: ${board}, Class ${classLevel}
+- Subject: ${subject}
+- Chapter: ${chapter}
+- Current Topic: ${topic}
+${subtopics && subtopics.length > 0 ? `- Planned Subtopics: ${subtopics.join(', ')}` : ''}
+- Student Understanding Level: ${studentLevel} (${
+  studentLevel === 'Weak' ? 'Weak understanding. Explain with simple everyday words, step-by-step intuition, concrete foundational examples, and highlight common misconceptions.' :
+  studentLevel === 'Strong' ? 'Strong understanding. Provide advanced mathematical/scientific depth, edge cases, inter-topic connections, and high-order reasoning.' :
+  'Average understanding. Balance clear definitions, standard board syllabus derivations, practical examples, and common traps.'
+})
+- Preferred Style: ${learningStyle}
+- Allocated Session Time: ${allocatedMinutes} minutes
+
+STRICT CURRICULUM ACCURACY REQUIREMENTS:
+1. Educational accuracy is non-negotiable. Content MUST strictly follow the ${board} Class ${classLevel} syllabus for ${subject} -> ${chapter} -> ${topic}.
+2. Do NOT invent fake formulas or imaginary science laws. For English, grammar, or humanities, explain linguistic structures and rules—NEVER mention physics units (cm to m, grams to kg) or conservation laws!
+3. Cover approximately 6 to 7 important subtopics/concepts directly explaining "${topic}".
+4. Generate 4 to 6 "theory_qa" review questions: each has a conceptual theory question, complete theoretical answer for CBSE board exams, key points, and board marking tip.
+5. Generate a concise Today's Learning Summary (4-6 key takeaways).
+6. Generate EXACTLY 10 topic-specific quiz questions (multiple choice with 4 options each, correctOptionIndex 0-3, and clear explanations).
+7. Generate 5 interactive practice questions with hints and detailed explanations.
+
+Return ONLY a valid JSON object matching this schema (no markdown formatting, no code fences, no extra commentary):
+{
+  "subject": "${subject}",
+  "chapter": "${chapter}",
+  "topic": "${topic}",
+  "difficulty_level": "${studentLevel === 'Weak' ? 'Beginner' : studentLevel === 'Strong' ? 'Advanced' : 'Intermediate'}",
+  "learning_objectives": ["string", "string", "string"],
+  "subtopics": [
+    {
+      "id": "sub_1",
+      "title": "Subtopic Title",
+      "explanation": "Clear pedagogical explanation adapted to student level",
+      "formulaOrRule": "Governing formula or rule, if applicable",
+      "intuition": "Intuitive mental model or why this works",
+      "example": "Worked example with step-by-step reasoning",
+      "commonMistake": "Frequent student misconception or exam pitfall",
+      "importantPoints": ["Key point 1", "Key point 2"]
+    }
+  ],
+  "theory": "Comprehensive theory overview synthesizing the topic",
+  "theory_qa": [
+    {
+      "id": "tqa_1",
+      "question": "Conceptual theory question testing deep understanding of ${topic}",
+      "theoreticalAnswer": "Full, complete, structured theoretical answer suitable for CBSE board subjective marks",
+      "keyPoints": ["Key point 1", "Key point 2"],
+      "boardMarkingTip": "Examiner guidance on mandatory keywords or definitions"
+    }
+  ],
+  "summary": ["Takeaway 1", "Takeaway 2", "Takeaway 3", "Takeaway 4"],
+  "questions": [
+    {
+      "id": "q_th_1",
+      "question": "Question text testing topic specifically",
+      "difficulty": "easy",
+      "options": ["Option A", "Option B", "Option C", "Option D"],
+      "correctOptionIndex": 0,
+      "answer": "Option A",
+      "explanation": "Step-by-step explanation of why this answer is correct and why other choices fail",
+      "conceptTested": "Concept tested"
+    }
+  ],
+  "summary": ["Takeaway 1", "Takeaway 2", "Takeaway 3", "Takeaway 4"],
+  "practice_questions": [
+    {
+      "id": "q_pr_1",
+      "question": "Practice question text",
+      "difficulty": "easy",
+      "options": ["Option A", "Option B", "Option C", "Option D"],
+      "correctOptionIndex": 0,
+      "answer": "Option A",
+      "explanation": "Detailed explanation of correct answer",
+      "hint": "Guiding hint without directly revealing answer"
+    }
+  ]
+}`;
+
+                    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${effectiveModel}:generateContent?key=${effectiveApiKey}`;
+                    const apiRes = await fetch(geminiUrl, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+                        generationConfig: {
+                          responseMimeType: 'application/json',
+                          temperature: 0.3
+                        }
+                      })
+                    });
+
+                    if (apiRes.ok) {
+                      const resJson = await apiRes.json();
+                      const raw = resJson?.candidates?.[0]?.content?.parts?.[0]?.text;
+                      if (raw) {
+                        const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+                        const parsed = JSON.parse(cleaned);
+                        if (
+                          parsed &&
+                          Array.isArray(parsed.subtopics) &&
+                          parsed.subtopics.length >= 4 &&
+                          Array.isArray(parsed.questions) &&
+                          parsed.questions.length >= 8
+                        ) {
+                          // Normalize question format if needed
+                          if (!Array.isArray(parsed.theory_qa) || parsed.theory_qa.length === 0) {
+                            const fallbackPack = buildSubjectCurriculumLesson({
+                              classLevel, board, subject, chapter, topic, subtopics, studentLevel, allocatedMinutes
+                            });
+                            parsed.theory_qa = fallbackPack.theory_qa || [];
+                          }
+                          parsed.questions = parsed.questions.map((q: any, idx: number) => {
+                            const options = Array.isArray(q.options) && q.options.length === 4
+                              ? q.options
+                              : ['Option A', 'Option B', 'Option C', 'Option D'];
+                            const correctOptionIndex = typeof q.correctOptionIndex === 'number' && q.correctOptionIndex >= 0 && q.correctOptionIndex < 4
+                              ? q.correctOptionIndex
+                              : (typeof q.correctOption === 'number' ? q.correctOption : 0);
+                            return {
+                              id: q.id || `q_th_${idx + 1}`,
+                              question: q.question || `Question ${idx + 1} on ${topic}`,
+                              difficulty: (q.difficulty || (idx < 4 ? 'easy' : idx < 7 ? 'moderate' : 'hard')).toLowerCase(),
+                              options,
+                              correctOptionIndex,
+                              answer: q.answer || options[correctOptionIndex],
+                              explanation: q.explanation || `According to ${board} Class ${classLevel} syllabus, this matches the standard definition.`,
+                              conceptTested: q.conceptTested || `${topic} Principles`
+                            };
+                          });
+
+                          // Normalize practice questions
+                          if (Array.isArray(parsed.practice_questions)) {
+                            parsed.practice_questions = parsed.practice_questions.map((pq: any, idx: number) => {
+                              const options = Array.isArray(pq.options) && pq.options.length === 4
+                                ? pq.options
+                                : ['Option A', 'Option B', 'Option C', 'Option D'];
+                              const correctOptionIndex = typeof pq.correctOptionIndex === 'number' && pq.correctOptionIndex >= 0 && pq.correctOptionIndex < 4
+                                ? pq.correctOptionIndex
+                                : 0;
+                              return {
+                                id: pq.id || `q_pr_${idx + 1}`,
+                                question: pq.question || `Practice problem ${idx + 1} on ${topic}`,
+                                difficulty: (pq.difficulty || (idx < 2 ? 'easy' : idx < 4 ? 'moderate' : 'hard')).toLowerCase(),
+                                options,
+                                correctOptionIndex,
+                                answer: pq.answer || options[correctOptionIndex],
+                                explanation: pq.explanation || `Derived by applying the governing rules of ${topic}.`,
+                                hint: pq.hint || `Recall the key formula and boundary conditions for ${topic}.`
+                              };
+                            });
+                          }
+
+                          generatedLesson = {
+                            ...parsed,
+                            allocatedMinutes,
+                            source: 'ai_generated',
+                            createdAt: new Date().toISOString()
+                          };
+                          isDemo = false;
+                        }
+                      }
+                    }
+                  } catch (aiErr) {
+                    console.warn('Gemini adaptive lesson generation failed, using curriculum engine fallback:', aiErr);
+                  }
+                }
+
+                // If AI call failed, not configured, or returned invalid JSON, generate curriculum-grounded fallback
+                if (!generatedLesson) {
+                  generatedLesson = createServerCurriculumLessonFallback({
+                    classLevel,
+                    board,
+                    subject,
+                    chapter,
+                    topic,
+                    subtopics,
+                    studentLevel,
+                    allocatedMinutes
+                  });
+                }
+
+                return sendJson(200, {
+                  isDemoMode: isDemo,
+                  lesson: generatedLesson
+                });
               }
 
               return sendJson(404, { error: 'Unknown AI endpoint' });

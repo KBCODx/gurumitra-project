@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "test": "npx -y tsx tests/preAssessmentPipeline.test.mjs"
+    "test": "npx -y tsx tests/preAssessmentPipeline.test.mjs && npx -y tsx tests/learningPathPlanner.test.mjs && node tests/final_presentation_loop.test.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.116.0",

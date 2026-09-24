@@ -16,10 +16,11 @@ import {
   BrainCircuit,
   Info,
   Layers,
-  Target
+  ChevronRight,
+  HelpCircle
 } from 'lucide-react';
 import { useStudent } from '../context/StudentContext';
-import { PreAssessmentResult, LearningGapItem, RecommendedNextAction } from '../types';
+import { PreAssessmentResult, LearningGapItem, SubjectType } from '../types';
 
 interface PreAssessmentResultViewProps {
   result: PreAssessmentResult;
@@ -30,9 +31,106 @@ export const PreAssessmentResultView: React.FC<PreAssessmentResultViewProps> = (
   result,
   onRetake
 }) => {
-  const { setActiveTab, setActiveSubject, setTopicContext } = useStudent();
+  const {
+    setActiveTab,
+    setActiveSubject,
+    setTopicContext,
+    setSelectedPlannerSubjects,
+    setPlannerStep
+  } = useStudent();
   const [showQuestionReview, setShowQuestionReview] = useState(false);
   const [expandedGapId, setExpandedGapId] = useState<string | null>(null);
+  const [expandedChapterIds, setExpandedChapterIds] = useState<Record<string, boolean>>({});
+  const [evidenceChapterIds, setEvidenceChapterIds] = useState<Record<string, boolean>>({});
+
+  const toggleChapterExpand = (id: string) => {
+    setExpandedChapterIds(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const toggleEvidenceExpand = (id: string) => {
+    setEvidenceChapterIds(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  // 1. Identify all subjects that were actually part of the assessment
+  const assessedSubjects = Array.from(
+    new Set([
+      ...result.questionPerformance.map(q => q.subject),
+      ...Object.values(result.chapterPerformance).map(c => c.subject)
+    ])
+  ).filter(Boolean) as SubjectType[];
+
+  // 2. Build subject breakdown strictly from assessment data
+  const subjectBreakdown = assessedSubjects.map(sub => {
+    const subQuestions = result.questionPerformance.filter(
+      q => q.subject.toLowerCase() === sub.toLowerCase()
+    );
+    const subChapters = Object.entries(result.chapterPerformance)
+      .filter(([_, ch]) => ch.subject.toLowerCase() === sub.toLowerCase())
+      .map(([chId, ch]) => {
+        const qList = subQuestions.filter(
+          q => q.chapterId === chId || q.chapterName.toLowerCase() === ch.chapterName.toLowerCase()
+        );
+        const qCount = qList.length > 0 ? qList.length : ch.total;
+        const correctCount = qList.length > 0 ? qList.filter(q => q.isCorrect).length : ch.correct;
+        const accuracy = qCount > 0 ? Math.round((correctCount / qCount) * 100) : ch.accuracy;
+
+        let confidence: 'High' | 'Medium' | 'Limited Data' = 'High';
+        if (qCount <= 1) confidence = 'Limited Data';
+        else if (qCount <= 3) confidence = 'Medium';
+
+        let status: 'Strong' | 'Developing' | 'Needs Attention' = 'Needs Attention';
+        if (accuracy >= 80) status = 'Strong';
+        else if (accuracy >= 50) status = 'Developing';
+
+        const topicEntries = Object.entries(result.topicPerformance).filter(
+          ([_, t]) => t.chapterName.toLowerCase() === ch.chapterName.toLowerCase() && t.subject.toLowerCase() === sub.toLowerCase()
+        );
+
+        const easyQ = qList.filter(q => q.difficulty === 'easy');
+        const modQ = qList.filter(q => q.difficulty === 'moderate');
+        const diffQ = qList.filter(q => q.difficulty === 'difficult');
+
+        return {
+          chapterId: chId,
+          chapterName: ch.chapterName,
+          subject: sub,
+          accuracy,
+          qCount,
+          correctCount,
+          incorrectCount: qCount - correctCount,
+          confidence,
+          status,
+          easyRatio: `${easyQ.filter(q => q.isCorrect).length}/${easyQ.length}`,
+          modRatio: `${modQ.filter(q => q.isCorrect).length}/${modQ.length}`,
+          diffRatio: `${diffQ.filter(q => q.isCorrect).length}/${diffQ.length}`,
+          topics: topicEntries.map(([_, t]) => ({
+            topicName: t.topicName,
+            accuracy: t.accuracy,
+            total: t.total,
+            correct: t.correct,
+            status: t.accuracy >= 80 ? 'Strong' : t.accuracy >= 50 ? 'Developing' : 'Needs Attention'
+          }))
+        };
+      });
+
+    const totalSubQ = subQuestions.length;
+    const totalSubCorrect = subQuestions.filter(q => q.isCorrect).length;
+    const subAccuracy = totalSubQ > 0 ? Math.round((totalSubCorrect / totalSubQ) * 100) : 0;
+
+    const strongAreas = subChapters.filter(c => c.status === 'Strong').length;
+    const needsPractice = subChapters.filter(c => c.status === 'Developing').length;
+    const needsAttention = subChapters.filter(c => c.status === 'Needs Attention').length;
+
+    return {
+      subject: sub,
+      accuracy: subAccuracy,
+      totalQuestions: totalSubQ,
+      chapters: subChapters,
+      strongAreas,
+      needsPractice,
+      needsAttention
+    };
+  });
 
   // Formatting helpers
   const formatSeconds = (sec: number) => {
@@ -58,19 +156,7 @@ export const PreAssessmentResultView: React.FC<PreAssessmentResultViewProps> = (
 
   const levelColor = getLevelColor(result.learningLevel);
 
-  const handleStartAction = (action: RecommendedNextAction) => {
-    if (action.subject) {
-      setActiveSubject(action.subject);
-    }
-    if (action.chapter && action.topic) {
-      setTopicContext(action.subject, action.chapter, action.topic);
-    }
-    if (action.actionType === 'review') {
-      setActiveTab('tutor');
-    } else {
-      setActiveTab('adaptive');
-    }
-  };
+
 
   return (
     <div style={{
@@ -399,44 +485,333 @@ export const PreAssessmentResultView: React.FC<PreAssessmentResultViewProps> = (
             </div>
           </div>
         </div>
+      </div>
 
-        {/* Chapter Performance Breakdown */}
-        <div className="card" style={{ padding: '24px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px' }}>
-            <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#1E293B', margin: 0 }}>
-              Chapter-Wise Diagnostics
-            </h3>
-            <span style={{ fontSize: '0.75rem', color: '#64748B', fontWeight: 600 }}>
-              {Object.keys(result.chapterPerformance).length} Chapters
-            </span>
+      {/* Subject-Wise & Chapter Understanding Section */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#4F46E5', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                Subject Diagnostics
+              </span>
+              <span style={{
+                fontSize: '0.75rem',
+                fontWeight: 700,
+                padding: '2px 8px',
+                borderRadius: '999px',
+                backgroundColor: '#EEF2FF',
+                color: '#4F46E5'
+              }}>
+                Overall Understanding: {result.overallScore}%
+              </span>
+            </div>
+            <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: '#1E293B', margin: '4px 0 0' }}>
+              Subject & Chapter Understanding Matrix
+            </h2>
           </div>
+          <p style={{ fontSize: '0.82rem', color: '#64748B', margin: 0 }}>
+            Derived strictly from your actual pre-assessment responses.
+          </p>
+        </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', maxHeight: '220px', overflowY: 'auto' }}>
-            {Object.entries(result.chapterPerformance).map(([chId, ch]) => (
-              <div key={chId} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.82rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <span style={{ fontWeight: 700, color: '#1E293B' }}>{ch.chapterName}</span>
-                    <span style={{ fontSize: '0.7rem', color: '#64748B', backgroundColor: '#F1F5F9', padding: '1px 6px', borderRadius: '6px' }}>
-                      {ch.subject}
+        {subjectBreakdown.map((subItem) => (
+          <div
+            key={subItem.subject}
+            className="card"
+            style={{
+              padding: '24px',
+              border: '1.5px solid var(--border-subtle)',
+              backgroundColor: '#FFFFFF',
+              borderRadius: '16px'
+            }}
+          >
+            {/* Subject Summary Header */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: '16px',
+              paddingBottom: '18px',
+              borderBottom: '1px solid #F1F5F9'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{
+                  width: '46px',
+                  height: '46px',
+                  borderRadius: '12px',
+                  backgroundColor: '#EEF2FF',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '22px'
+                }}>
+                  {subItem.subject === 'Mathematics' && '📐'}
+                  {subItem.subject === 'Science' && '🔬'}
+                  {subItem.subject === 'English' && '📖'}
+                  {subItem.subject === 'Computer Science' && '💻'}
+                  {subItem.subject === 'Social Science' && '🌍'}
+                  {!['Mathematics', 'Science', 'English', 'Computer Science', 'Social Science'].includes(subItem.subject) && '📚'}
+                </div>
+                <div>
+                  <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#1E293B', margin: 0 }}>
+                    {subItem.subject}
+                  </h3>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '3px' }}>
+                    <span style={{ fontSize: '0.86rem', fontWeight: 700, color: '#4F46E5' }}>
+                      Understanding: {subItem.accuracy}%
+                    </span>
+                    <span style={{ fontSize: '0.78rem', color: '#64748B' }}>
+                      ({subItem.totalQuestions} questions assessed)
                     </span>
                   </div>
-                  <span style={{ fontWeight: 800, color: ch.accuracy >= 70 ? '#059669' : ch.accuracy >= 50 ? '#D97706' : '#DC2626' }}>
-                    {ch.accuracy}%
-                  </span>
-                </div>
-                <div style={{ height: '6px', backgroundColor: '#F1F5F9', borderRadius: '999px', overflow: 'hidden' }}>
-                  <div style={{
-                    height: '100%',
-                    width: `${ch.accuracy}%`,
-                    backgroundColor: ch.accuracy >= 70 ? '#10B981' : ch.accuracy >= 50 ? '#F59E0B' : '#EF4444',
-                    borderRadius: '999px'
-                  }} />
                 </div>
               </div>
-            ))}
+
+              {/* Area Count Badges */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <span style={{
+                  fontSize: '0.78rem',
+                  fontWeight: 700,
+                  padding: '4px 10px',
+                  borderRadius: '8px',
+                  backgroundColor: '#DCFCE7',
+                  color: '#15803D',
+                  border: '1px solid #BBF7D0'
+                }}>
+                  Strong Areas: {subItem.strongAreas}
+                </span>
+                <span style={{
+                  fontSize: '0.78rem',
+                  fontWeight: 700,
+                  padding: '4px 10px',
+                  borderRadius: '8px',
+                  backgroundColor: '#FEF3C7',
+                  color: '#B45309',
+                  border: '1px solid #FDE68A'
+                }}>
+                  Needs Practice: {subItem.needsPractice}
+                </span>
+                <span style={{
+                  fontSize: '0.78rem',
+                  fontWeight: 700,
+                  padding: '4px 10px',
+                  borderRadius: '8px',
+                  backgroundColor: '#FEE2E2',
+                  color: '#B91C1C',
+                  border: '1px solid #FECACA'
+                }}>
+                  Needs Attention: {subItem.needsAttention}
+                </span>
+              </div>
+            </div>
+
+            {/* Chapter Table */}
+            <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {subItem.chapters.map((ch) => {
+                const isExpanded = !!expandedChapterIds[ch.chapterId];
+                const isEvidenceOpen = !!evidenceChapterIds[ch.chapterId];
+
+                const statusColor = ch.status === 'Strong'
+                  ? { bg: '#DCFCE7', text: '#15803D', border: '#BBF7D0' }
+                  : ch.status === 'Developing'
+                  ? { bg: '#FEF3C7', text: '#B45309', border: '#FDE68A' }
+                  : { bg: '#FEE2E2', text: '#B91C1C', border: '#FECACA' };
+
+                return (
+                  <div
+                    key={ch.chapterId}
+                    style={{
+                      border: '1px solid #E2E8F0',
+                      borderRadius: '12px',
+                      backgroundColor: '#F8FAFC',
+                      overflow: 'hidden',
+                      transition: 'all 0.2s ease'
+                    }}
+                  >
+                    {/* Chapter Row Header */}
+                    <div style={{
+                      padding: '14px 18px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      flexWrap: 'wrap',
+                      gap: '12px',
+                      backgroundColor: '#FFFFFF'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: '240px' }}>
+                        <button
+                          onClick={() => toggleChapterExpand(ch.chapterId)}
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            color: '#64748B',
+                            cursor: 'pointer',
+                            padding: '4px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            borderRadius: '4px'
+                          }}
+                          title="Expand topic breakdown"
+                        >
+                          {isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+                        </button>
+
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontSize: '0.96rem', fontWeight: 700, color: '#1E293B' }}>
+                              {ch.chapterName}
+                            </span>
+                            {ch.topics.length > 0 && (
+                              <span style={{ fontSize: '0.72rem', color: '#64748B', backgroundColor: '#F1F5F9', padding: '1px 6px', borderRadius: '4px' }}>
+                                {ch.topics.length} topics
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '2px', fontSize: '0.75rem', color: '#64748B' }}>
+                            <span>Questions: {ch.qCount}</span>
+                            <span>•</span>
+                            <span>Confidence: <strong style={{ color: ch.confidence === 'Limited Data' ? '#D97706' : '#1E293B' }}>{ch.confidence}</strong></span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Score, Progress Bar, Status Badge & Action */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                        <div style={{ width: '110px', display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', fontWeight: 800 }}>
+                            <span style={{ color: ch.confidence === 'Limited Data' ? '#D97706' : '#1E293B' }}>
+                              {ch.confidence === 'Limited Data' ? `${ch.accuracy}%*` : `${ch.accuracy}%`}
+                            </span>
+                            <span style={{ fontSize: '0.7rem', color: '#64748B', fontWeight: 500 }}>
+                              {ch.correctCount}/{ch.qCount}
+                            </span>
+                          </div>
+                          <div style={{ height: '6px', backgroundColor: '#E2E8F0', borderRadius: '999px', overflow: 'hidden' }}>
+                            <div style={{
+                              height: '100%',
+                              width: `${ch.accuracy}%`,
+                              backgroundColor: ch.accuracy >= 80 ? '#10B981' : ch.accuracy >= 50 ? '#F59E0B' : '#EF4444',
+                              borderRadius: '999px'
+                            }} />
+                          </div>
+                        </div>
+
+                        <span style={{
+                          fontSize: '0.74rem',
+                          fontWeight: 700,
+                          padding: '3px 8px',
+                          borderRadius: '6px',
+                          backgroundColor: statusColor.bg,
+                          color: statusColor.text,
+                          border: `1px solid ${statusColor.border}`,
+                          minWidth: '95px',
+                          textAlign: 'center'
+                        }}>
+                          {ch.status}
+                        </span>
+
+                        <button
+                          onClick={() => toggleEvidenceExpand(ch.chapterId)}
+                          style={{
+                            padding: '4px 10px',
+                            fontSize: '0.76rem',
+                            fontWeight: 600,
+                            borderRadius: '6px',
+                            backgroundColor: isEvidenceOpen ? '#EEF2FF' : '#F1F5F9',
+                            color: isEvidenceOpen ? '#4F46E5' : '#475569',
+                            border: isEvidenceOpen ? '1px solid #C7D2FE' : '1px solid #E2E8F0',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          {isEvidenceOpen ? 'Hide Evidence' : 'Why this score?'}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Transparent Evidence Box */}
+                    {isEvidenceOpen && (
+                      <div style={{
+                        padding: '12px 18px',
+                        backgroundColor: '#F8FAFC',
+                        borderTop: '1px solid #E2E8F0',
+                        fontSize: '0.8rem',
+                        color: '#475569'
+                      }}>
+                        <div style={{ fontWeight: 700, color: '#1E293B', marginBottom: '6px' }}>
+                          Transparent Diagnostic Evidence for {ch.chapterName}:
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '8px' }}>
+                          <div>• <strong>Questions Attempted:</strong> {ch.qCount}</div>
+                          <div>• <strong>Correct:</strong> {ch.correctCount} | <strong>Incorrect:</strong> {ch.incorrectCount}</div>
+                          <div>• <strong>Easy Questions:</strong> {ch.easyRatio} correct</div>
+                          <div>• <strong>Moderate Questions:</strong> {ch.modRatio} correct</div>
+                          <div>• <strong>Difficult Questions:</strong> {ch.diffRatio} correct</div>
+                        </div>
+                        {ch.confidence === 'Limited Data' && (
+                          <div style={{ marginTop: '6px', color: '#B45309', fontSize: '0.75rem', fontWeight: 600 }}>
+                            * Note: Only 1 question was asked from this chapter in the diagnostic baseline. Confidence is marked Limited Data until more practice is completed.
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Expandable Topic Level Rows */}
+                    {isExpanded && (
+                      <div style={{
+                        padding: '12px 18px',
+                        backgroundColor: '#FFFFFF',
+                        borderTop: '1px solid #E2E8F0',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '8px'
+                      }}>
+                        <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase' }}>
+                          Topic-Level Understanding
+                        </div>
+                        {ch.topics.length > 0 ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            {ch.topics.map((top, tIdx) => (
+                              <div
+                                key={tIdx}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  padding: '8px 12px',
+                                  borderRadius: '8px',
+                                  backgroundColor: '#F8FAFC',
+                                  border: '1px solid #E2E8F0'
+                                }}
+                              >
+                                <span style={{ fontSize: '0.86rem', color: '#1E293B', fontWeight: 600 }}>
+                                  {top.topicName}
+                                </span>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                  <span style={{ fontSize: '0.82rem', fontWeight: 800, color: top.accuracy >= 80 ? '#059669' : top.accuracy >= 50 ? '#D97706' : '#DC2626' }}>
+                                    {top.accuracy}%
+                                  </span>
+                                  <span style={{ fontSize: '0.72rem', color: '#64748B' }}>
+                                    ({top.correct}/{top.total} correct)
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div style={{ fontSize: '0.82rem', color: '#64748B', fontStyle: 'italic' }}>
+                            Chapter tested as a unified conceptual unit ({ch.qCount} questions).
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
-        </div>
+        ))}
       </div>
 
       {/* Identified Knowledge Gaps (Traceable Evidence Chain) */}
@@ -587,95 +962,7 @@ export const PreAssessmentResultView: React.FC<PreAssessmentResultViewProps> = (
         )}
       </div>
 
-      {/* Recommended Next Actions: The Adaptive Bridge */}
-      <div className="card" style={{
-        padding: '28px',
-        border: '1.5px solid #C7D2FE',
-        backgroundColor: '#FFFFFF'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '18px' }}>
-          <div style={{
-            width: '36px',
-            height: '36px',
-            borderRadius: '12px',
-            background: 'linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#FFFFFF'
-          }}>
-            <Target size={20} />
-          </div>
-          <div>
-            <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#1E293B', margin: 0 }}>
-              Your Tailored Adaptive Learning Path
-            </h3>
-            <span style={{ fontSize: '0.78rem', color: '#64748B' }}>
-              Generated directly from your diagnostic performance to maximize mastery
-            </span>
-          </div>
-        </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
-          {result.recommendedNextActions.map((action) => (
-            <div
-              key={action.step}
-              style={{
-                padding: '20px',
-                borderRadius: '16px',
-                backgroundColor: '#F8FAFC',
-                border: '1px solid #E2E8F0',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'space-between',
-                gap: '14px'
-              }}
-            >
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                  <span style={{
-                    width: '24px',
-                    height: '24px',
-                    borderRadius: '50%',
-                    backgroundColor: '#4F46E5',
-                    color: '#FFFFFF',
-                    fontSize: '0.78rem',
-                    fontWeight: 800,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}>
-                    {action.step}
-                  </span>
-                  <span style={{
-                    fontSize: '0.72rem',
-                    fontWeight: 700,
-                    textTransform: 'uppercase',
-                    color: '#64748B'
-                  }}>
-                    {action.actionType.toUpperCase()}
-                  </span>
-                </div>
-                <h4 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#1E293B', margin: '0 0 4px' }}>
-                  {action.title}
-                </h4>
-                <p style={{ fontSize: '0.82rem', color: '#64748B', margin: 0, lineHeight: 1.4 }}>
-                  {action.description}
-                </p>
-              </div>
-
-              <button
-                onClick={() => handleStartAction(action)}
-                className="btn btn-primary"
-                style={{ padding: '8px 16px', fontSize: '0.82rem', width: '100%', justifyContent: 'center' }}
-              >
-                <span>{action.actionType === 'review' ? 'Ask AI Tutor' : 'Start Study Session'}</span>
-                <ArrowRight size={14} />
-              </button>
-            </div>
-          ))}
-        </div>
-      </div>
 
       {/* Accordion: Review All Questions & Explanations */}
       <div className="card" style={{ padding: '20px 24px' }}>
@@ -886,6 +1173,73 @@ export const PreAssessmentResultView: React.FC<PreAssessmentResultViewProps> = (
             })}
           </div>
         )}
+      </div>
+
+      {/* Prominent Bottom CTA: Start Planning My Learning Path */}
+      <div style={{
+        marginTop: '16px',
+        padding: '28px 32px',
+        borderRadius: '18px',
+        background: 'linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%)',
+        color: '#FFFFFF',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        flexWrap: 'wrap',
+        gap: '20px',
+        boxShadow: '0 12px 30px -4px rgba(79, 70, 229, 0.4)'
+      }}>
+        <div style={{ maxWidth: '620px' }}>
+          <div style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            backgroundColor: 'rgba(255,255,255,0.2)',
+            padding: '4px 12px',
+            borderRadius: '999px',
+            fontSize: '0.75rem',
+            fontWeight: 700,
+            textTransform: 'uppercase',
+            letterSpacing: '0.04em',
+            marginBottom: '8px'
+          }}>
+            <Sparkles size={13} />
+            <span>Next Phase: Personalized Learning Path</span>
+          </div>
+          <h2 style={{ fontSize: '1.45rem', fontWeight: 800, margin: '0 0 6px', color: '#FFFFFF' }}>
+            Ready to Plan Your Adaptive Learning Journey?
+          </h2>
+          <p style={{ fontSize: '0.9rem', color: '#E0E7FF', margin: 0, lineHeight: 1.5 }}>
+            Combine your pre-assessment diagnostic results with your syllabus PDF to ground what you need to learn against what you already understand.
+          </p>
+        </div>
+
+        <button
+          onClick={() => {
+            const subsToPlan = assessedSubjects.length > 0 ? assessedSubjects : ['Mathematics'];
+            setSelectedPlannerSubjects(subsToPlan);
+            setPlannerStep('subjects');
+            setActiveTab('learning-path-planner');
+          }}
+          style={{
+            backgroundColor: '#FFFFFF',
+            color: '#4F46E5',
+            border: 'none',
+            borderRadius: '12px',
+            padding: '14px 26px',
+            fontSize: '0.98rem',
+            fontWeight: 800,
+            cursor: 'pointer',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '10px',
+            boxShadow: '0 6px 20px rgba(0,0,0,0.15)',
+            transition: 'all 0.2s ease'
+          }}
+        >
+          <span>Start My Learning Path</span>
+          <ArrowRight size={18} />
+        </button>
       </div>
     </div>
   );

@@ -22,16 +22,14 @@ import {
   TrendingUp,
   X,
   Loader2,
-  Layers,
-  Plus
+  Layers
 } from 'lucide-react';
 import { useStudent } from '../context/StudentContext';
 import { useAuth } from '../context/AuthContext';
 import {
   calculateScheduleMetrics,
   getPerformanceCategory,
-  rescheduleMissedTasks,
-  parseLocalDate
+  rescheduleMissedTasks
 } from '../services/deterministicSchedulingService';
 import {
   SubjectType,
@@ -106,148 +104,19 @@ export const LearningPathView: React.FC = () => {
     if (!activeLearningPlan) return;
     const adjustedPlan = rescheduleMissedTasks(activeLearningPlan, todayStr);
     recordLearningPlan(adjustedPlan);
-    setAdaptSuccessMsg('Missed tasks have been rescheduled into upcoming Sunday Remedial Classes! Weekday study load remains intact.');
-  };
-
-  // Set Up Remedial Class Modal State (Scheduled exclusively on Sundays)
-  const [isRemedialModalOpen, setIsRemedialModalOpen] = useState(false);
-  const [remedialSubject, setRemedialSubject] = useState<SubjectType>('Mathematics');
-  const [remedialChapter, setRemedialChapter] = useState('');
-  const [remedialTopic, setRemedialTopic] = useState('');
-  const [remedialDuration, setRemedialDuration] = useState(45);
-  const [remedialSundayDate, setRemedialSundayDate] = useState('');
-
-  // Find all available Sundays in the learning plan (strictly verified via parseLocalDate)
-  const planSundays = useMemo(() => {
-    if (!activeLearningPlan) return [];
-    return activeLearningPlan.dailyPlans.filter(d => {
-      const parsed = parseLocalDate(d.date);
-      return parsed.getDay() === 0 || d.day === 'Sunday' || d.dayOfWeek === 'Sunday';
-    });
-  }, [activeLearningPlan]);
-
-  const handleOpenRemedialModal = (targetDate?: string) => {
-    if (activeLearningPlan && activeLearningPlan.selectedSubjects.length > 0) {
-      setRemedialSubject(activeLearningPlan.selectedSubjects[0] as SubjectType);
-    }
-    // CRITICAL USER REQUIREMENT: Remedial classes must be added strictly on SUNDAYS, never on weekdays!
-    // If targetDate is provided (e.g. from viewing any weekday), find the next upcoming Sunday on or after targetDate.
-    const refDate = targetDate || todayStr;
-    const matchingSun = planSundays.find(s => s.date >= refDate);
-    const defaultSun = matchingSun ? matchingSun.date : (planSundays.length > 0 ? planSundays[0].date : '');
-
-    setRemedialSundayDate(defaultSun);
-    setRemedialChapter('');
-    setRemedialTopic('');
-    setRemedialDuration(45);
-    setIsRemedialModalOpen(true);
-  };
-
-  const handleScheduleRemedialClass = () => {
-    if (!activeLearningPlan || !remedialSundayDate) return;
-
-    // Strict validation: Verify remedialSundayDate is genuinely a Sunday!
-    const parsed = parseLocalDate(remedialSundayDate);
-    if (parsed.getDay() !== 0) {
-      const validSunday = planSundays.find(s => s.date >= remedialSundayDate) || planSundays[0];
-      if (validSunday) {
-        setRemedialSundayDate(validSunday.date);
-        return;
-      }
-    }
-
-    const topicTitle = remedialTopic.trim() || 'Targeted Concept Reinforcement';
-    const chapterTitle = remedialChapter.trim() || `${remedialSubject} Remedial Class`;
-
-    const newTask: DailyStudyTask = {
-      id: `task_remedial_manual_${Date.now()}`,
-      subject: remedialSubject,
-      chapter: chapterTitle,
-      topic: topicTitle,
-      activity: 'Remedial Review',
-      durationMinutes: remedialDuration,
-      completed: false,
-      priority: 'High Priority',
-      isWeakTopic: true
-    };
-
-    const updatedDaily = activeLearningPlan.dailyPlans.map(d => {
-      // Must match chosen Sunday date and be verified Sunday
-      const isTargetSunday = d.date === remedialSundayDate && (parseLocalDate(d.date).getDay() === 0 || d.day === 'Sunday' || d.dayOfWeek === 'Sunday');
-      if (isTargetSunday) {
-        return {
-          ...d,
-          tasks: [...d.tasks, newTask],
-          totalStudyMinutes: d.totalStudyMinutes + remedialDuration,
-          restDayNote: 'Sunday Remedial Reinforcement: Focused catch-up session scheduled on Sunday so your weekday study load remains balanced.'
-        };
-      }
-      return d;
-    });
-
-    recordLearningPlan({
-      ...activeLearningPlan,
-      dailyPlans: updatedDaily,
-      updatedAt: new Date().toISOString()
-    });
-
-    const targetIdx = activeLearningPlan.dailyPlans.findIndex(d => d.date === remedialSundayDate);
-    if (targetIdx >= 0) {
-      setSelectedDayIdx(targetIdx);
-    }
-
-    setIsRemedialModalOpen(false);
-    setAdaptSuccessMsg(`✅ Remedial class scheduled for Sunday (${remedialSundayDate})! Weekday study schedule remains protected.`);
   };
 
   // Launch a specific study task in Tutor / Adaptive Learning mode
   const handleStartTask = (task: DailyStudyTask) => {
     setActiveSubject(task.subject as SubjectType);
-
-    // Determine student understanding level from real pre-assessment & task weighting
-    let studentLevel: 'Weak' | 'Average' | 'Strong' = 'Average';
-    if (task.isWeakTopic) {
-      studentLevel = 'Weak';
-    } else if (preAssessmentResult) {
-      const chAccuracy = preAssessmentResult.chapterPerformance?.[task.chapter]?.accuracy;
-      const subAccuracy = preAssessmentResult.subjectPerformance?.[task.subject]?.percentage;
-      const effAcc = typeof chAccuracy === 'number' ? chAccuracy : (typeof subAccuracy === 'number' ? subAccuracy : 65);
-      if (effAcc < 50) {
-        studentLevel = 'Weak';
-      } else if (effAcc >= 75) {
-        studentLevel = 'Strong';
-      } else {
-        studentLevel = 'Average';
-      }
-    }
-
-    setTopicContext(
-      task.subject as SubjectType,
-      task.chapter,
-      task.topic,
-      undefined,
-      undefined,
-      studentLevel === 'Weak' ? 'Beginner' : studentLevel === 'Strong' ? 'Advanced' : 'Intermediate',
-      {
-        allocatedMinutes: task.durationMinutes || 45,
-        taskId: task.id,
-        dayDate: activeDayPlan?.date,
-        subtopics: task.subtopics,
-        isWeakTopic: task.isWeakTopic,
-        activityType: task.activity,
-        studentLevel
-      }
-    );
+    setTopicContext(task.subject as SubjectType, task.chapter, task.topic);
     setActiveTab('adaptive');
   };
 
   // Launch topic node from legacy graph
   const handleLaunchTopic = (node: any) => {
     setActiveSubject(node.subject);
-    setTopicContext(node.subject, node.title, node.title, undefined, undefined, 'Intermediate', {
-      allocatedMinutes: 45,
-      studentLevel: 'Average'
-    });
+    setTopicContext(node.subject, node.title, node.title);
     setActiveTab('adaptive');
   };
 
@@ -405,30 +274,22 @@ export const LearningPathView: React.FC = () => {
     }
 
     // Deterministic adaptation fallback:
-    // User Requirement: Remedial classes must be added strictly on SUNDAYS, not on weekdays!
     if (activeLearningPlan && weakTopics.length > 0) {
-      let injected = 0;
       const updatedDaily: DailyStudyPlan[] = activeLearningPlan.dailyPlans.map((d, dIdx) => {
-        const isSun = d.isRestDay || d.day === 'Sunday' || d.dayOfWeek === 'Sunday';
-        if (dIdx >= selectedDayIdx && isSun && injected < weakTopics.length) {
-          const newRemedialTasks: DailyStudyTask[] = weakTopics.slice(injected, injected + 2).map((wt, iIdx) => ({
-            id: `task_remedial_sun_${Date.now()}_${injected + iIdx}`,
-            subject: activeLearningPlan.selectedSubjects[0] || 'Remedial',
-            chapter: 'Remedial Reinforcement',
-            topic: wt,
-            activity: 'Remedial Review' as const,
-            durationMinutes: 35,
-            completed: false,
-            priority: 'High Priority' as const,
-            isWeakTopic: true
-          }));
-          injected += newRemedialTasks.length;
-          return {
-            ...d,
-            tasks: [...d.tasks, ...newRemedialTasks],
-            totalStudyMinutes: d.totalStudyMinutes + newRemedialTasks.reduce((s, t) => s + t.durationMinutes, 0),
-            restDayNote: 'Sunday Remedial Reinforcement: Focused catch-up session scheduled on Sunday so your weekday study load remains balanced.'
-          };
+        // Boost practice for days after current day if topics match
+        if (dIdx > selectedDayIdx && !d.isRestDay) {
+          const matchingTasks: DailyStudyTask[] = d.tasks.map(t => {
+            const isWeak = weakTopics.some(w => w.includes(t.chapter));
+            if (isWeak) {
+              return {
+                ...t,
+                activity: 'Remedial Review' as const,
+                durationMinutes: Math.min(90, Math.round(t.durationMinutes * 1.3))
+              };
+            }
+            return t;
+          });
+          return { ...d, tasks: matchingTasks };
         }
         return d;
       });
@@ -438,7 +299,7 @@ export const LearningPathView: React.FC = () => {
         dailyPlans: updatedDaily,
         updatedAt: new Date().toISOString()
       });
-      setAdaptSuccessMsg('Study plan adapted: Sunday remedial reinforcement scheduled for weak areas identified in this test.');
+      setAdaptSuccessMsg('Study plan adapted: upcoming days will reinforce weak areas identified in this test.');
     }
 
     setIsAdaptingPlan(false);
@@ -766,43 +627,26 @@ export const LearningPathView: React.FC = () => {
                 You have {missedTasksPrior.length} incomplete study task(s) from earlier days.
               </div>
               <div style={{ fontSize: '0.82rem', color: '#B45309', marginTop: '2px' }}>
-                We can dynamically reschedule them into upcoming Sunday Remedial Classes without adding extra study load to your weekdays.
+                We can dynamically reschedule them into upcoming active study days without delaying your exam target.
               </div>
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <button
-              onClick={() => handleOpenRemedialModal()}
-              style={{
-                backgroundColor: '#FFFFFF',
-                color: '#92400E',
-                border: '1.5px solid #FCD34D',
-                borderRadius: '8px',
-                padding: '9px 15px',
-                fontSize: '0.82rem',
-                fontWeight: 700,
-                cursor: 'pointer'
-              }}
-            >
-              Set Up Remedial Class
-            </button>
-            <button
-              onClick={handleReschedule}
-              style={{
-                backgroundColor: '#D97706',
-                color: '#FFFFFF',
-                border: 'none',
-                borderRadius: '8px',
-                padding: '10px 18px',
-                fontSize: '0.84rem',
-                fontWeight: 800,
-                cursor: 'pointer',
-                boxShadow: '0 4px 10px rgba(217, 119, 6, 0.25)'
-              }}
-            >
-              Reschedule to Sunday Remedial Class
-            </button>
-          </div>
+          <button
+            onClick={handleReschedule}
+            style={{
+              backgroundColor: '#D97706',
+              color: '#FFFFFF',
+              border: 'none',
+              borderRadius: '8px',
+              padding: '10px 18px',
+              fontSize: '0.84rem',
+              fontWeight: 800,
+              cursor: 'pointer',
+              boxShadow: '0 4px 10px rgba(217, 119, 6, 0.25)'
+            }}
+          >
+            Reschedule Missed Tasks
+          </button>
         </div>
       )}
 
@@ -880,7 +724,7 @@ export const LearningPathView: React.FC = () => {
                     {new Date(day.date).getDate()} {new Date(day.date).toLocaleDateString('en-GB', { month: 'short' })}
                   </span>
                   <span style={{ fontSize: '0.7rem', color: isSunday ? '#92400E' : allTasksDone ? '#10B981' : '#64748B', fontWeight: 600 }}>
-                    {isSunday ? (day.tasks.length > 0 ? `🌿 ${day.totalStudyMinutes}m Remedial` : '🌿 Rest') : `${day.totalStudyMinutes}m`}
+                    {isSunday ? '🌿 Rest' : `${day.totalStudyMinutes}m`}
                   </span>
                 </button>
               );
@@ -919,34 +763,6 @@ export const LearningPathView: React.FC = () => {
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  {!activeDayPlan.isRestDay && (
-                    <button
-                      onClick={() => {
-                        if (activeDayPlan.tasks.length > 0) {
-                          setRemedialSubject(activeDayPlan.tasks[0].subject as SubjectType);
-                          setRemedialChapter(activeDayPlan.tasks[0].chapter);
-                        }
-                        handleOpenRemedialModal(activeDayPlan.date);
-                      }}
-                      style={{
-                        backgroundColor: '#FFFBEB',
-                        color: '#92400E',
-                        border: '1.5px solid #FCD34D',
-                        borderRadius: '10px',
-                        padding: '8px 14px',
-                        fontSize: '0.8rem',
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px'
-                      }}
-                      title="Need extra reinforcement for weak topics? Schedule a focused remedial session on upcoming Sunday without loading your weekdays."
-                    >
-                      <Plus size={14} />
-                      <span>Set Up Sunday Remedial Class</span>
-                    </button>
-                  )}
                   <div style={{ textAlign: 'right' }}>
                     <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase' }}>
                       Scheduled Load
@@ -958,8 +774,8 @@ export const LearningPathView: React.FC = () => {
                 </div>
               </div>
 
-              {/* Sunday Rest Day View: Either pure Rest (0 tasks) or Remedial Session (>0 tasks) */}
-              {activeDayPlan.isRestDay && activeDayPlan.tasks.length === 0 ? (
+              {/* Sunday Rest Day View */}
+              {activeDayPlan.isRestDay ? (
                 <div style={{
                   backgroundColor: '#F0FDF4',
                   border: '1.5px solid #BBF7D0',
@@ -992,199 +808,9 @@ export const LearningPathView: React.FC = () => {
                     <span style={{ backgroundColor: '#DCFCE7', color: '#15803D', padding: '6px 14px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 700 }}>
                       ✓ Review past mistakes
                     </span>
-                    <button
-                      onClick={() => handleOpenRemedialModal(activeDayPlan.date)}
-                      style={{
-                        backgroundColor: '#15803D',
-                        color: '#FFFFFF',
-                        border: 'none',
-                        padding: '6px 14px',
-                        borderRadius: '8px',
-                        fontSize: '0.8rem',
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px'
-                      }}
-                    >
-                      <Plus size={14} />
-                      <span>Set Up Remedial Class on this Sunday</span>
-                    </button>
-                  </div>
-                </div>
-              ) : activeDayPlan.isRestDay && activeDayPlan.tasks.length > 0 ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  <div style={{
-                    backgroundColor: '#FEF3C7',
-                    border: '1.5px solid #FCD34D',
-                    borderRadius: '14px',
-                    padding: '22px 24px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    flexWrap: 'wrap',
-                    gap: '14px'
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                      <div style={{
-                        width: '46px',
-                        height: '46px',
-                        borderRadius: '12px',
-                        backgroundColor: '#FDE68A',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: '24px'
-                      }}>
-                        🌿
-                      </div>
-                      <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <h3 style={{ fontSize: '1.18rem', fontWeight: 800, color: '#92400E', margin: 0 }}>
-                            Sunday Remedial Class & Catch-Up Session
-                          </h3>
-                          <span style={{
-                            backgroundColor: '#D97706',
-                            color: '#FFFFFF',
-                            padding: '2px 8px',
-                            borderRadius: '6px',
-                            fontSize: '0.72rem',
-                            fontWeight: 800
-                          }}>
-                            {activeDayPlan.tasks.length} Remedial Task(s)
-                          </span>
-                        </div>
-                        <p style={{ color: '#B45309', fontSize: '0.85rem', margin: '4px 0 0', lineHeight: 1.4 }}>
-                          Dedicated remedial reinforcement scheduled on Sunday to master weak concepts without adding load to your weekdays.
-                        </p>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => handleOpenRemedialModal(activeDayPlan.date)}
-                      style={{
-                        backgroundColor: '#D97706',
-                        color: '#FFFFFF',
-                        border: 'none',
-                        borderRadius: '8px',
-                        padding: '8px 14px',
-                        fontSize: '0.82rem',
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px'
-                      }}
-                    >
-                      <Plus size={14} />
-                      <span>Add Remedial Task</span>
-                    </button>
-                  </div>
-
-                  {/* Render the Sunday Remedial Tasks */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                    {activeDayPlan.tasks.map(task => {
-                      const isDone = !!task.completed;
-
-                      return (
-                        <div
-                          key={task.id}
-                          style={{
-                            padding: '18px 20px',
-                            borderRadius: '12px',
-                            border: isDone ? '1px solid #BBF7D0' : '1.5px solid #FCD34D',
-                            backgroundColor: isDone ? '#F0FDF4' : '#FFFDF7',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            gap: '16px',
-                            transition: 'all 0.15s ease'
-                          }}
-                        >
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flex: 1 }}>
-                            <button
-                              onClick={() => handleToggleTask(activeDayPlan.date, task.id)}
-                              style={{
-                                width: '26px',
-                                height: '26px',
-                                borderRadius: '8px',
-                                border: isDone ? '2px solid #10B981' : '2px solid #D97706',
-                                backgroundColor: isDone ? '#10B981' : '#FFFFFF',
-                                color: '#FFFFFF',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                cursor: 'pointer',
-                                flexShrink: 0
-                              }}
-                              title={isDone ? 'Mark Incomplete' : 'Mark Complete'}
-                            >
-                              {isDone && <Check size={16} strokeWidth={3} />}
-                            </button>
-
-                            <div style={{ flex: 1 }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                                <span style={{
-                                  backgroundColor: '#FEF3C7',
-                                  color: '#B45309',
-                                  padding: '2px 8px',
-                                  borderRadius: '6px',
-                                  fontSize: '0.74rem',
-                                  fontWeight: 800
-                                }}>
-                                  {task.subject}
-                                </span>
-                                <span style={{ fontSize: '0.88rem', fontWeight: 800, color: isDone ? '#64748B' : '#1E293B', textDecoration: isDone ? 'line-through' : 'none' }}>
-                                  {task.chapter}
-                                </span>
-                                <span style={{ color: '#94A3B8', fontSize: '0.8rem' }}>•</span>
-                                <span style={{ fontSize: '0.84rem', color: '#475569' }}>
-                                  {task.topic}
-                                </span>
-                              </div>
-
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '4px' }}>
-                                <span style={{
-                                  fontSize: '0.74rem',
-                                  color: '#92400E',
-                                  fontWeight: 800,
-                                  backgroundColor: '#FDE68A',
-                                  padding: '2px 8px',
-                                  borderRadius: '4px'
-                                }}>
-                                  🌿 Remedial Review
-                                </span>
-                                <span style={{ color: '#CBD5E1' }}>|</span>
-                                <span style={{ fontSize: '0.78rem', color: '#D97706', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                  <Clock size={12} />
-                                  <span>{task.durationMinutes} min</span>
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-
-                          <button
-                            onClick={() => handleStartTask(task)}
-                            style={{
-                              backgroundColor: isDone ? '#F1F5F9' : '#D97706',
-                              color: isDone ? '#475569' : '#FFFFFF',
-                              border: 'none',
-                              borderRadius: '10px',
-                              padding: '10px 18px',
-                              fontSize: '0.84rem',
-                              fontWeight: 700,
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '6px'
-                            }}
-                          >
-                            <span>{isDone ? 'Review' : 'Start Remedial'}</span>
-                            <ArrowRight size={14} />
-                          </button>
-                        </div>
-                      );
-                    })}
+                    <span style={{ backgroundColor: '#DCFCE7', color: '#15803D', padding: '6px 14px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 700 }}>
+                      ✓ Catch up on missed work
+                    </span>
                   </div>
                 </div>
               ) : (
@@ -1808,264 +1434,6 @@ export const LearningPathView: React.FC = () => {
                   </button>
                 </>
               )}
-            </div>
-          </div>
-        </div>
-      )}
-      {/* =================================================================== */}
-      {/* 9. SET UP SUNDAY REMEDIAL CLASS MODAL */}
-      {/* =================================================================== */}
-      {isRemedialModalOpen && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(15, 23, 42, 0.65)',
-          backdropFilter: 'blur(4px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 9999,
-          padding: '20px'
-        }}>
-          <div style={{
-            backgroundColor: '#FFFFFF',
-            borderRadius: '20px',
-            maxWidth: '540px',
-            width: '100%',
-            overflow: 'hidden',
-            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-            border: '1px solid #E2E8F0'
-          }}>
-            {/* Modal Header */}
-            <div style={{
-              padding: '20px 24px',
-              borderBottom: '1px solid #E2E8F0',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              backgroundColor: '#FFFBEB'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{
-                  width: '42px',
-                  height: '42px',
-                  borderRadius: '12px',
-                  backgroundColor: '#FEF3C7',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '22px'
-                }}>
-                  🌿
-                </div>
-                <div>
-                  <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: '#92400E' }}>
-                    Set Up Sunday Remedial Class
-                  </h3>
-                  <p style={{ margin: '2px 0 0', fontSize: '0.8rem', color: '#B45309' }}>
-                    Scheduled exclusively on Sunday so your weekdays stay balanced
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setIsRemedialModalOpen(false)}
-                style={{ background: 'none', border: 'none', color: '#94A3B8', cursor: 'pointer', padding: '4px' }}
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            {/* Modal Body */}
-            <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '18px' }}>
-              {/* Sunday Policy Notice */}
-              <div style={{
-                backgroundColor: '#EFF6FF',
-                border: '1.5px solid #BFDBFE',
-                borderRadius: '10px',
-                padding: '12px 14px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-                fontSize: '0.82rem',
-                color: '#1E40AF'
-              }}>
-                <ShieldCheck size={20} color="#2563EB" style={{ flexShrink: 0 }} />
-                <span>
-                  <strong>Sunday-Only Policy:</strong> Remedial sessions are exclusively scheduled on Sundays so your weekday curriculum schedule is never overloaded or disrupted.
-                </span>
-              </div>
-
-              {/* Target Sunday Selector */}
-              <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1E293B', marginBottom: '6px' }}>
-                  Select Sunday Date
-                </label>
-                <select
-                  value={remedialSundayDate}
-                  onChange={(e) => setRemedialSundayDate(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '10px 14px',
-                    borderRadius: '10px',
-                    border: '1.5px solid #CBD5E1',
-                    fontSize: '0.88rem',
-                    color: '#1E293B',
-                    fontWeight: 600,
-                    backgroundColor: '#F8FAFC'
-                  }}
-                >
-                  {planSundays.map(s => (
-                    <option key={s.date} value={s.date}>
-                      Sunday, {new Date(s.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
-                      {s.date === todayStr ? ' (Today)' : ''}
-                      {s.tasks.length > 0 ? ` (${s.tasks.length} task(s) already scheduled)` : ' (Rest Day)'}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Subject Selector */}
-              <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1E293B', marginBottom: '6px' }}>
-                  Subject
-                </label>
-                <select
-                  value={remedialSubject}
-                  onChange={(e) => setRemedialSubject(e.target.value as SubjectType)}
-                  style={{
-                    width: '100%',
-                    padding: '10px 14px',
-                    borderRadius: '10px',
-                    border: '1.5px solid #CBD5E1',
-                    fontSize: '0.88rem',
-                    color: '#1E293B',
-                    fontWeight: 600,
-                    backgroundColor: '#F8FAFC'
-                  }}
-                >
-                  {(activeLearningPlan?.selectedSubjects || ['Mathematics', 'Science', 'English']).map(sub => (
-                    <option key={sub} value={sub}>{sub}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Chapter Name */}
-              <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1E293B', marginBottom: '6px' }}>
-                  Chapter / Area Needing Help
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Quadratic Equations, Chemical Reactions"
-                  value={remedialChapter}
-                  onChange={(e) => setRemedialChapter(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '10px 14px',
-                    borderRadius: '10px',
-                    border: '1.5px solid #CBD5E1',
-                    fontSize: '0.88rem',
-                    boxSizing: 'border-box'
-                  }}
-                />
-              </div>
-
-              {/* Specific Topic */}
-              <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1E293B', marginBottom: '6px' }}>
-                  Specific Weak Concept / Topic
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Nature of Roots, Redox Reactions, Word Problems"
-                  value={remedialTopic}
-                  onChange={(e) => setRemedialTopic(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '10px 14px',
-                    borderRadius: '10px',
-                    border: '1.5px solid #CBD5E1',
-                    fontSize: '0.88rem',
-                    boxSizing: 'border-box'
-                  }}
-                />
-              </div>
-
-              {/* Duration Options */}
-              <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1E293B', marginBottom: '6px' }}>
-                  Session Duration
-                </label>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
-                  {[30, 45, 60].map(mins => (
-                    <button
-                      key={mins}
-                      type="button"
-                      onClick={() => setRemedialDuration(mins)}
-                      style={{
-                        padding: '10px',
-                        borderRadius: '10px',
-                        border: remedialDuration === mins ? '2px solid #D97706' : '1px solid #CBD5E1',
-                        backgroundColor: remedialDuration === mins ? '#FEF3C7' : '#FFFFFF',
-                        color: remedialDuration === mins ? '#92400E' : '#475569',
-                        fontWeight: 700,
-                        fontSize: '0.84rem',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      {mins} mins
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* Modal Footer */}
-            <div style={{
-              padding: '16px 24px',
-              borderTop: '1px solid #E2E8F0',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'flex-end',
-              gap: '12px',
-              backgroundColor: '#FAFAFA'
-            }}>
-              <button
-                type="button"
-                onClick={() => setIsRemedialModalOpen(false)}
-                style={{
-                  background: 'none',
-                  border: '1px solid #CBD5E1',
-                  borderRadius: '10px',
-                  padding: '10px 18px',
-                  fontSize: '0.88rem',
-                  color: '#64748B',
-                  cursor: 'pointer'
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleScheduleRemedialClass}
-                disabled={!remedialSundayDate}
-                style={{
-                  backgroundColor: '#D97706',
-                  color: '#FFFFFF',
-                  border: 'none',
-                  borderRadius: '10px',
-                  padding: '10px 24px',
-                  fontSize: '0.9rem',
-                  fontWeight: 800,
-                  cursor: !remedialSundayDate ? 'not-allowed' : 'pointer',
-                  boxShadow: '0 4px 12px rgba(217, 119, 6, 0.3)'
-                }}
-              >
-                Schedule on Sunday
-              </button>
             </div>
           </div>
         </div>

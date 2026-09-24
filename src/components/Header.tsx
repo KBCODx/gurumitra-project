@@ -10,6 +10,7 @@ export const Header: React.FC = () => {
     setPreferredStyle,
     setActiveTab,
     resetToDefault,
+    resetDemo,
     judgeDemoStep,
     setJudgeDemoStep
   } = useStudent();
@@ -34,7 +35,7 @@ export const Header: React.FC = () => {
     if (parts.length >= 2) {
       return (parts[0][0] + parts[1][0]).toUpperCase();
     }
-    return fullName.slice(0, 2).toUpperCase() || 'KD';
+    return fullName.slice(0, 2).toUpperCase() || 'SS';
   };
 
   const initials = getInitials(student.name);
@@ -129,21 +130,44 @@ export const Header: React.FC = () => {
           <span>Judge Demo Tour</span>
         </button>
 
-        {/* Reset State button */}
-        <button
-          onClick={resetToDefault}
-          className="btn btn-ghost"
-          style={{
-            padding: '6px 10px',
-            fontSize: '0.75rem',
-            borderRadius: '8px',
-            color: '#94A3B8'
-          }}
-          title="Reset sample progress to baseline"
-        >
-          <RotateCcw size={13} />
-          <span>Reset</span>
-        </button>
+        {/* Reset Demo / Reset State button */}
+        {user?.isDemo ? (
+          <button
+            onClick={resetDemo}
+            className="btn"
+            style={{
+              padding: '6px 12px',
+              fontSize: '0.78rem',
+              borderRadius: '999px',
+              backgroundColor: '#FEF2F2',
+              border: '1.5px solid #FECACA',
+              color: '#B91C1C',
+              fontWeight: 700,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}
+            title="Reset Demo user to initial presentation state (onboarding ready)"
+          >
+            <RotateCcw size={13} color="#B91C1C" />
+            <span>Reset Demo</span>
+          </button>
+        ) : (
+          <button
+            onClick={resetToDefault}
+            className="btn btn-ghost"
+            style={{
+              padding: '6px 10px',
+              fontSize: '0.75rem',
+              borderRadius: '8px',
+              color: '#94A3B8'
+            }}
+            title="Reset sample progress to baseline"
+          >
+            <RotateCcw size={13} />
+            <span>Reset</span>
+          </button>
+        )}
 
         {/* Streak Pill matching Screenshot Panel 3 */}
         <div style={{

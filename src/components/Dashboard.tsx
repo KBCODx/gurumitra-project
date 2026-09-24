@@ -20,7 +20,7 @@ import { useStudent } from '../context/StudentContext';
 import { getTodaysLesson, getChapters } from '../services/curriculumService';
 
 export const Dashboard: React.FC = () => {
-  const { student, subjects, activities, activeSubject, setActiveTab, setActiveSubject, currentLearningContext, preAssessmentResult } = useStudent();
+  const { student, subjects, activities, activeSubject, setActiveTab, setActiveSubject, currentLearningContext, preAssessmentResult, progressMetrics } = useStudent();
 
   const todaysLesson = getTodaysLesson(
     student.grade,
@@ -477,32 +477,32 @@ export const Dashboard: React.FC = () => {
         gap: '20px'
       }}>
         <div className="card" style={{ padding: '18px 20px', borderLeft: '4px solid #4F46E5' }}>
-          <span style={{ fontSize: '0.75rem', color: '#64748B', fontWeight: 600 }}>Overall Progress</span>
+          <span style={{ fontSize: '0.75rem', color: '#64748B', fontWeight: 600 }}>Today's Progress</span>
           <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#1E293B', marginTop: '4px' }}>
-            {student.overallProgress}%
+            {progressMetrics.todayProgressPct}%
           </div>
-          <div style={{ fontSize: '0.72rem', color: '#10B981', fontWeight: 700, marginTop: '2px' }}>
-            ↑ 8% from last week
+          <div style={{ fontSize: '0.72rem', color: '#4F46E5', fontWeight: 700, marginTop: '2px' }}>
+            {progressMetrics.todayCompletedTasks} / {progressMetrics.todayTotalTasks} tasks completed
           </div>
         </div>
 
         <div className="card" style={{ padding: '18px 20px', borderLeft: '4px solid #10B981' }}>
-          <span style={{ fontSize: '0.75rem', color: '#64748B', fontWeight: 600 }}>Overall Accuracy</span>
+          <span style={{ fontSize: '0.75rem', color: '#64748B', fontWeight: 600 }}>This Week's Runway</span>
           <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#1E293B', marginTop: '4px' }}>
-            {student.overallAccuracy}%
+            {progressMetrics.weekProgressPct}%
           </div>
           <div style={{ fontSize: '0.72rem', color: '#10B981', fontWeight: 700, marginTop: '2px' }}>
-            ↑ 12% improvement
+            {progressMetrics.weekCompletedTasks} / {progressMetrics.weekTotalTasks} tasks completed
           </div>
         </div>
 
         <div className="card" style={{ padding: '18px 20px', borderLeft: '4px solid #F59E0B' }}>
-          <span style={{ fontSize: '0.75rem', color: '#64748B', fontWeight: 600 }}>Completed Lessons</span>
+          <span style={{ fontSize: '0.75rem', color: '#64748B', fontWeight: 600 }}>Overall Progress</span>
           <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#1E293B', marginTop: '4px' }}>
-            {student.completedLessons}
+            {student.overallProgress}%
           </div>
-          <div style={{ fontSize: '0.72rem', color: '#64748B', fontWeight: 600, marginTop: '2px' }}>
-            Across 5 active subjects
+          <div style={{ fontSize: '0.72rem', color: '#D97706', fontWeight: 600, marginTop: '2px' }}>
+            {progressMetrics.overallCompletedTasks} / {progressMetrics.overallTotalTasks} total curriculum units
           </div>
         </div>
 
@@ -512,7 +512,7 @@ export const Dashboard: React.FC = () => {
             {student.streak} Days 🔥
           </div>
           <div style={{ fontSize: '0.72rem', color: '#EC4899', fontWeight: 700, marginTop: '2px' }}>
-            Personal best record!
+            Daily consistency record
           </div>
         </div>
       </div>
@@ -640,26 +640,39 @@ export const Dashboard: React.FC = () => {
               >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <span style={{ fontSize: '1.6rem' }}>{sub.icon}</span>
-                  <span style={{
-                    fontSize: '0.72rem',
-                    fontWeight: 700,
-                    color: sub.color,
-                    backgroundColor: sub.bgLight,
-                    padding: '2px 8px',
-                    borderRadius: '6px'
-                  }}>
-                    {sub.progress}% Mastery
-                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{
+                      fontSize: '0.72rem',
+                      fontWeight: 700,
+                      color: sub.color,
+                      backgroundColor: sub.bgLight,
+                      padding: '2px 8px',
+                      borderRadius: '6px'
+                    }}>
+                      {sub.progress}% Progress
+                    </span>
+                    <span style={{
+                      fontSize: '0.72rem',
+                      fontWeight: 700,
+                      color: '#047857',
+                      backgroundColor: '#ECFDF5',
+                      padding: '2px 8px',
+                      borderRadius: '6px',
+                      border: '1px solid #A7F3D0'
+                    }}>
+                      {sub.accuracy}% Mastery
+                    </span>
+                  </div>
                 </div>
                 <div>
                   <h4 style={{ fontSize: '1rem', fontWeight: 800, color: '#1E293B', margin: '0 0 4px' }}>
                     {sub.name}
                   </h4>
-                  <p style={{ fontSize: '0.75rem', color: '#64748B', margin: 0 }}>
-                    {sub.completedTopics} of {sub.totalTopics} Topics • Level: {sub.level}
+                  <p style={{ fontSize: '0.75rem', color: '#64748B', margin: '0 0 2px' }}>
+                    {sub.completedTopics} / {sub.totalTopics} Topics Completed
                   </p>
                 </div>
-                <div className="progress-bar-container" style={{ height: '5px' }}>
+                <div className="progress-bar-container" style={{ height: '6px' }}>
                   <div className="progress-bar-fill" style={{ width: `${sub.progress}%`, backgroundColor: sub.color }} />
                 </div>
               </div>

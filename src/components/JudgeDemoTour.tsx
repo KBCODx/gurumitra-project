@@ -29,7 +29,7 @@ export const JudgeDemoTour: React.FC = () => {
       step: 1,
       title: 'Step 1: Student Dashboard Overview',
       tab: 'dashboard',
-      instruction: 'Observe Khushi’s baseline status (Beginner, 76% progress, Today’s Focus with Functional Groups marked High Priority).',
+      instruction: 'Observe Sally Sharma’s baseline status (Class 10 CBSE, 76% progress, Today’s Focus with High Priority concepts).',
       actionText: 'Go to AI Tutor',
       action: () => {
         setActiveTab('tutor');

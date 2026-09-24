@@ -18,6 +18,7 @@ import { UploadMaterialView } from './components/UploadMaterialView';
 import { ProfileModal } from './components/ProfileModal';
 import { JudgeDemoTour } from './components/JudgeDemoTour';
 import { PreAssessmentView } from './components/PreAssessmentView';
+import { LearningPathPlannerView } from './components/LearningPathPlannerView';
 import { AlertCircle, CheckCircle, Info, X, GraduationCap, Loader2, Sparkles } from 'lucide-react';
 
 const AppContent: React.FC = () => {
@@ -31,21 +32,29 @@ const AppContent: React.FC = () => {
         return <AITutor />;
       case 'subjects':
         return <SubjectsView />;
+      case 'study':
       case 'adaptive':
         return <AdaptiveStudySession />;
       case 'quiz':
+      case 'quizzes':
         return <QuizView />;
+      case 'progress':
       case 'analytics':
         return <AnalyticsView />;
       case 'recommendations':
         return <RecommendationsView />;
       case 'learning-path':
+      case 'learningPath':
         return <LearningPathView />;
+      case 'learning-path-planner':
+        return <LearningPathPlannerView />;
       case 'upload':
         return <UploadMaterialView />;
       case 'syllabus-analysis':
         return <SyllabusAnalysisView />;
       case 'pre-assessment':
+      case 'assessment':
+      case 'assessments':
         return <PreAssessmentView />;
       case 'profile':
         return <ProfileModal />;
@@ -237,8 +246,8 @@ const AppRoot: React.FC = () => {
     return <AuthScreen />;
   }
 
-  // One-time syllabus upload onboarding (skip for demo users and returning users who already uploaded)
-  if (!syllabusUploaded && user && !user.isDemo) {
+  // One-time syllabus upload onboarding (for new users who haven't uploaded yet or after demo reset)
+  if (!syllabusUploaded && user) {
     return <SyllabusUploadView />;
   }
 

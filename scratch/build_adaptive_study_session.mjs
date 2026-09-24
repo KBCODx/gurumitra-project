@@ -1,4 +1,7 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import fs from 'fs';
+import path from 'path';
+
+const content = `import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   ArrowRight,
   ArrowLeft,
@@ -92,7 +95,7 @@ export const AdaptiveStudySession: React.FC = () => {
   });
 
   // Timer State
-  const timerStorageKey = `gurumitra_timer_${taskId || `${subject}_${topic}`.replace(/[^a-z0-9]/gi, '_')}`;
+  const timerStorageKey = \`gurumitra_timer_\${taskId || \`\${subject}_\${topic}\`.replace(/[^a-z0-9]/gi, '_')}\`;
   const [timeLeftSeconds, setTimeLeftSeconds] = useState<number>(() => {
     try {
       const saved = localStorage.getItem(timerStorageKey);
@@ -221,7 +224,7 @@ export const AdaptiveStudySession: React.FC = () => {
   const formatTime = (totalSec: number) => {
     const mins = Math.floor(totalSec / 60);
     const secs = totalSec % 60;
-    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+    return \`\${String(mins).padStart(2, '0')}:\${String(secs).padStart(2, '0')}\`;
   };
 
   // Subtopic toggle
@@ -285,7 +288,7 @@ export const AdaptiveStudySession: React.FC = () => {
 
     // Record attempt asynchronously
     recordQuestionAttempt({
-      id: `att_${q.id}_${Date.now()}`,
+      id: \`att_\${q.id}_\${Date.now()}\`,
       userId: student.id || 'student',
       lessonId: lesson?.id || 'lesson',
       questionId: q.id,
@@ -329,7 +332,7 @@ export const AdaptiveStudySession: React.FC = () => {
     }));
 
     recordQuestionAttempt({
-      id: `att_${pq.id}_${Date.now()}`,
+      id: \`att_\${pq.id}_\${Date.now()}\`,
       userId: student.id || 'student',
       lessonId: lesson?.id || 'lesson',
       questionId: pq.id,
@@ -394,7 +397,7 @@ export const AdaptiveStudySession: React.FC = () => {
     );
 
     const sessionRecord: StudySessionRecord = {
-      id: `session_${Date.now()}`,
+      id: \`session_\${Date.now()}\`,
       userId: student.id || 'student',
       taskId,
       date: new Date().toISOString().split('T')[0],
@@ -428,7 +431,7 @@ export const AdaptiveStudySession: React.FC = () => {
     } catch {}
 
     // Navigate to Learning Path view where the completed task and remaining classes for the day appear
-    setActiveTab('learning-path');
+    setActiveTab('learningPath');
   };
 
   // Find next task in active plan if available
@@ -545,7 +548,7 @@ export const AdaptiveStudySession: React.FC = () => {
               <span>Retry Generation</span>
             </button>
             <button
-              onClick={() => setActiveTab('learning-path')}
+              onClick={() => setActiveTab('learningPath')}
               className="btn btn-secondary"
             >
               Return to Day Plan
@@ -640,7 +643,7 @@ export const AdaptiveStudySession: React.FC = () => {
 
           <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
             <button
-              onClick={() => setActiveTab('learning-path')}
+              onClick={() => setActiveTab('learningPath')}
               className="btn btn-primary"
               style={{ padding: '12px 28px' }}
             >
@@ -675,27 +678,6 @@ export const AdaptiveStudySession: React.FC = () => {
         }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-              <button
-                onClick={() => setActiveTab('learning-path')}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  fontSize: '0.75rem',
-                  fontWeight: 700,
-                  color: '#475569',
-                  backgroundColor: '#F1F5F9',
-                  border: '1px solid #E2E8F0',
-                  padding: '4px 10px',
-                  borderRadius: '8px',
-                  cursor: 'pointer'
-                }}
-                title="Return to Learning Path & Day Plan"
-              >
-                <ArrowLeft size={13} />
-                <span>Learning Path</span>
-              </button>
-
               <span style={{
                 fontSize: '0.75rem',
                 fontWeight: 800,
@@ -795,7 +777,7 @@ export const AdaptiveStudySession: React.FC = () => {
                   color: timeLeftSeconds === 0 ? '#DC2626' : '#1E293B',
                   letterSpacing: '1px'
                 }}>
-                  {timeLeftSeconds > 0 ? formatTime(timeLeftSeconds) : `+${formatTime(overtimeSeconds)}`}
+                  {timeLeftSeconds > 0 ? formatTime(timeLeftSeconds) : \`+\${formatTime(overtimeSeconds)}\`}
                 </div>
               </div>
             </div>
@@ -855,7 +837,7 @@ export const AdaptiveStudySession: React.FC = () => {
             </span>
           </div>
           <div className="progress-bar-container" style={{ height: '7px' }}>
-            <div className="progress-bar-fill" style={{ width: `${progressPercentage}%` }} />
+            <div className="progress-bar-fill" style={{ width: \`\${progressPercentage}%\` }} />
           </div>
 
           <div style={{
@@ -866,11 +848,11 @@ export const AdaptiveStudySession: React.FC = () => {
             flexWrap: 'wrap'
           }}>
             {[
-              { id: 'learn', label: '1. Learn Theory & Subtopics', count: `${lesson.subtopics.length} concepts` },
-              { id: 'theory_qa', label: '2. Theory Review Q&A', count: `${theoryQaList.length} Q&As` },
-              { id: 'summary', label: '3. Today\'s Summary', count: `${lesson.summary.length} takeaways` },
-              { id: 'questions', label: '4. Topic Quiz (10 Questions)', count: `${theoryAttemptedCount}/${theoryQuestionsCount} completed` },
-              { id: 'practice', label: '5. Practice Lab', count: `${practiceAttemptedCount}/${practiceQuestionsCount} solved` }
+              { id: 'learn', label: '1. Learn Theory & Subtopics', count: \`\${lesson.subtopics.length} concepts\` },
+              { id: 'theory_qa', label: '2. Theory Review Q&A', count: \`\${theoryQaList.length} Q&As\` },
+              { id: 'summary', label: '3. Today\\'s Summary', count: \`\${lesson.summary.length} takeaways\` },
+              { id: 'questions', label: '4. Topic Quiz (10 Questions)', count: \`\${theoryAttemptedCount}/\${theoryQuestionsCount} completed\` },
+              { id: 'practice', label: '5. Practice Lab', count: \`\${practiceAttemptedCount}/\${practiceQuestionsCount} solved\` }
             ].map(tab => {
               const isActive = activeTab === tab.id;
               return (
@@ -907,7 +889,7 @@ export const AdaptiveStudySession: React.FC = () => {
               );
             })}
 
-            {/* Record Study Session Action Button */}
+            {/* Complete Study Session Action Button */}
             <button
               onClick={handleCompleteSession}
               className="btn btn-primary"
@@ -924,7 +906,7 @@ export const AdaptiveStudySession: React.FC = () => {
               title="Record session and return to Learning Path Day Plan"
             >
               <CheckCircle2 size={16} />
-              <span>Record Session</span>
+              <span>Complete Study Session</span>
             </button>
           </div>
         </div>
@@ -1102,7 +1084,7 @@ export const AdaptiveStudySession: React.FC = () => {
                             {idx + 1}
                           </span>
                           <span style={{ fontSize: '0.98rem', fontWeight: 700, color: '#1E293B' }}>
-                            {sub.title.replace(/^\d+\.\s*/, '')}
+                            {sub.title.replace(/^\\d+\\.\\s*/, '')}
                           </span>
                         </div>
                         {isExpanded ? <ChevronDown size={18} color="#4F46E5" /> : <ChevronRight size={18} color="#94A3B8" />}
@@ -1670,7 +1652,7 @@ export const AdaptiveStudySession: React.FC = () => {
                                 gap: '12px',
                                 padding: '12px 16px',
                                 borderRadius: '10px',
-                                border: `1px solid ${borderColor}`,
+                                border: \`1px solid \${borderColor}\`,
                                 backgroundColor: bgColor,
                                 cursor: isSubmitted ? 'default' : 'pointer',
                                 transition: 'all 0.15s ease'
@@ -1751,32 +1733,13 @@ export const AdaptiveStudySession: React.FC = () => {
                   <span>Back to Summary</span>
                 </button>
 
-                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                  <button
-                    onClick={handleCompleteSession}
-                    className="btn btn-secondary"
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      borderColor: '#10B981',
-                      color: '#059669',
-                      backgroundColor: '#ECFDF5'
-                    }}
-                    title="Finish now, record session and return to Learning Path"
-                  >
-                    <CheckCircle2 size={16} />
-                    <span>Record Session</span>
-                  </button>
-
-                  <button
-                    onClick={() => setLocalActiveTab('practice')}
-                    className="btn btn-primary"
-                    style={{ padding: '10px 22px' }}
-                  >
-                    <span>Next: Practice Lab ({lesson.practice_questions.length} Problems) →</span>
-                  </button>
-                </div>
+                <button
+                  onClick={() => setLocalActiveTab('practice')}
+                  className="btn btn-primary"
+                  style={{ padding: '10px 22px' }}
+                >
+                  <span>Next: Practice Lab ({lesson.practice_questions.length} Problems) →</span>
+                </button>
               </div>
             </div>
           )}
@@ -1887,7 +1850,7 @@ export const AdaptiveStudySession: React.FC = () => {
                                 gap: '12px',
                                 padding: '12px 16px',
                                 borderRadius: '10px',
-                                border: `1px solid ${borderColor}`,
+                                border: \`1px solid \${borderColor}\`,
                                 backgroundColor: bgColor,
                                 cursor: isSubmitted ? 'default' : 'pointer'
                               }}
@@ -2013,10 +1976,9 @@ export const AdaptiveStudySession: React.FC = () => {
                     alignItems: 'center',
                     gap: '8px'
                   }}
-                  title="Save progress and return to Learning Path to view remaining classes"
                 >
                   <Award size={18} />
-                  <span>Record Session & Return to Learning Path</span>
+                  <span>Finish & Record Study Session</span>
                 </button>
               </div>
             </div>
@@ -2165,3 +2127,7 @@ export const AdaptiveStudySession: React.FC = () => {
     </div>
   );
 };
+`;
+
+fs.writeFileSync('src/components/AdaptiveStudySession.tsx', content, 'utf8');
+console.log('Successfully wrote src/components/AdaptiveStudySession.tsx');

@@ -108,6 +108,13 @@ export interface CurrentLearningContext {
   topicId?: string;
   learningStyle: LearningStyle;
   difficulty: DifficultyLevel;
+  allocatedMinutes?: number;
+  taskId?: string;
+  dayDate?: string;
+  subtopics?: string[];
+  isWeakTopic?: boolean;
+  activityType?: string;
+  studentLevel?: 'Weak' | 'Average' | 'Strong';
 }
 
 export interface StudentAcademicProfile {
@@ -217,6 +224,10 @@ export interface QuizQuestion {
 }
 
 export interface QuizResult {
+  id?: string;
+  timestamp?: string;
+  chapter?: string;
+  timeSpentSeconds?: number;
   score: number;
   totalQuestions: number;
   accuracy: number;
@@ -313,12 +324,13 @@ export interface AuthUser {
     fileName: string;
     fileSize: number;
     uploadedAt: string;
-    storagePath: string;
-    publicUrl: string;
+    storagePath?: string;
+    publicUrl?: string;
     extractedText: string;
     topics: string[]; // Detected topics from PDF
     examFocusedTopics?: Record<string, string[]>; // Chapter -> exam-focused topics (4-5 per chapter)
     analysisComplete: boolean;
+    [key: string]: any;
   }>;
 }
 
@@ -510,6 +522,11 @@ export interface PreAssessmentResult {
     total: number;
     correct: number;
   }>;
+  subjectPerformance?: Record<string, {
+    total: number;
+    correct: number;
+    percentage: number;
+  }>;
   difficultyPerformance: {
     easy: { correct: number; total: number; accuracy: number };
     moderate: { correct: number; total: number; accuracy: number };
@@ -539,4 +556,315 @@ export interface ChapterQuestionAllocation {
   easyCount: number;
   moderateCount: number;
   difficultCount: number;
+}
+
+// ============================================================================
+// LEARNING PATH PLANNING & AI SYLLABUS ANALYSIS TYPES
+// ============================================================================
+
+export type UnderstandingStatus =
+  | 'strong'
+  | 'developing'
+  | 'needs_attention'
+  | 'not_assessed';
+
+export type UnderstandingConfidence = 'high' | 'medium' | 'low' | 'none';
+
+export interface TopicAnalysisItem {
+  topicId: string;
+  topicName: string;
+  understanding: number | null; // null indicates 'Not Assessed', NEVER 0
+  status: UnderstandingStatus;
+  questionCount: number;
+  correctCount?: number;
+}
+
+export interface ChapterAnalysisItem {
+  chapterId: string;
+  chapterName: string;
+  subject: SubjectType;
+  understanding: number | null; // null indicates 'Not Assessed', NEVER 0
+  confidence: UnderstandingConfidence;
+  status: UnderstandingStatus;
+  questionCount: number;
+  correctCount: number;
+  incorrectCount: number;
+  difficultyBreakdown?: {
+    easy: { correct: number; total: number };
+    moderate: { correct: number; total: number };
+    difficult: { correct: number; total: number };
+  };
+  evidence?: {
+    questionIndex: number;
+    questionText: string;
+    difficulty: PreAssessmentDifficulty;
+    isCorrect: boolean;
+    userAnswerText?: string;
+    correctAnswerText?: string;
+  }[];
+  topics: TopicAnalysisItem[];
+  priority?: 'High Priority' | 'Practice' | 'On Track' | 'Explore';
+  recommendedAction?: string;
+}
+
+export interface SubjectLearningProfile {
+  subjectId: string;
+  subjectName: SubjectType;
+  assessmentUnderstanding: number | null; // Overall subject diagnostic understanding %
+  syllabusFileName?: string;
+  syllabusFileSize?: number;
+  extractedAt?: string;
+  totalChapters: number;
+  assessedChaptersCount: number;
+  unassessedChaptersCount: number;
+  strongAreasCount: number;
+  needsPracticeCount: number;
+  needsAttentionCount: number;
+  chapters: ChapterAnalysisItem[];
+  aiPedagogicalSummary?: {
+    strengths: string[];
+    gaps: string[];
+    immediatePriorities: string[];
+  };
+}
+
+export interface LearningProfile {
+  studentId: string;
+  updatedAt: string;
+  subjects: Record<string, SubjectLearningProfile>;
+}
+
+// ============================================================================
+// VERIFIED CURRICULUM & ADAPTIVE COMPANION ENGINE TYPES
+// ============================================================================
+
+export type PerformanceCategory =
+  | 'Needs Significant Improvement'
+  | 'Needs Improvement'
+  | 'Developing'
+  | 'Strong'
+  | 'Mastered';
+
+export interface CurriculumTopicRecord {
+  id: string;
+  name: string;
+  subtopics?: string[];
+}
+
+export interface CurriculumChapterRecord {
+  id: string;
+  name: string;
+  chapterNumber: number;
+  description?: string;
+  topics: CurriculumTopicRecord[];
+}
+
+export interface CurriculumSubjectRecord {
+  id: string;
+  name: SubjectType;
+  code?: string;
+  icon?: string;
+  color?: string;
+  chapters: CurriculumChapterRecord[];
+}
+
+export interface CurriculumVersion {
+  id: string;
+  board: BoardType | string;
+  classLevel: ClassLevel | string;
+  academicYear: string; // '2026-27'
+  sourceName: string; // 'CBSE Academic Official'
+  sourceUrl: string;
+  version: string;
+  isActive: boolean;
+  lastVerifiedAt: string;
+  subjects: CurriculumSubjectRecord[];
+}
+
+export interface DailyStudyTask {
+  id: string;
+  subject: SubjectType;
+  chapter: string;
+  topic: string;
+  subtopic?: string;
+  subtopics?: string[];
+  activity: 'Learn' | 'Practice' | 'Learn + Practice' | 'Revision' | 'Weekly Test' | 'Remedial Review';
+  durationMinutes: number;
+  completed: boolean;
+  missed?: boolean;
+  isMissed?: boolean;
+  rescheduled?: boolean;
+  isRevision?: boolean;
+  isWeakTopic?: boolean;
+  priority?: 'High Priority' | 'Moderate' | 'Light';
+  completedAt?: string;
+}
+
+export interface DailyStudyPlan {
+  date: string; // YYYY-MM-DD
+  day: string; // 'Monday', 'Sunday'
+  dayOfWeek?: string;
+  isRestDay: boolean; // Sunday
+  restDayNote?: string;
+  isRevisionPeriod?: boolean; // Final 7 days buffer
+  isWeeklyTestDay?: boolean;
+  isCompleted?: boolean;
+  tasks: DailyStudyTask[];
+  totalStudyMinutes: number;
+}
+
+export interface StudentLearningPlan {
+  id: string;
+  studentId: string;
+  curriculumVersionId: string;
+  academicYear: string;
+  classLevel: ClassLevel | string;
+  board: BoardType | string;
+  examDate: string; // YYYY-MM-DD
+  targetCompletionDate: string; // YYYY-MM-DD
+  syllabusCompletionTarget?: string;
+  daysAvailable: number;
+  studyDaysCount?: number;
+  restDaysCount?: number;
+  revisionDaysCount?: number;
+  hasBufferConflict: boolean;
+  conflictMessage?: string;
+  selectedSubjects: SubjectType[];
+  selectedChapters: Record<string, string[]>; // Subject -> chapter names
+  selectedChaptersCount?: number;
+  dailyMinutesBudget?: number;
+  dailyPlans: DailyStudyPlan[];
+  performanceSnapshot: Record<string, number>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface WeeklyTestQuestion {
+  id: string;
+  subject: SubjectType;
+  chapter: string;
+  topic: string;
+  difficulty: PreAssessmentDifficulty;
+  question: string;
+  options: string[];
+  correctOption: number;
+  explanation: string;
+}
+
+export interface WeeklyTestRecord {
+  id: string;
+  studentId: string;
+  weekNumber: number;
+  subject: SubjectType;
+  score: number;
+  totalQuestions: number;
+  percentage: number;
+  weakTopics: string[];
+  strongTopics: string[];
+  questionsData: WeeklyTestQuestion[];
+  studentAnswers: Record<string, number>;
+  adaptedPlanGenerated: boolean;
+  completedAt: string;
+}
+
+// -------------------------------------------------------------
+// AI ADAPTIVE STUDY SESSION TYPES
+// -------------------------------------------------------------
+
+export interface AdaptiveSubtopic {
+  id: string;
+  title: string;
+  explanation: string;
+  formulaOrRule?: string;
+  intuition?: string;
+  example?: string;
+  commonMistake?: string;
+  importantPoints?: string[];
+}
+
+export interface AdaptiveTheoryQuestion {
+  id: string;
+  question: string;
+  difficulty: 'easy' | 'moderate' | 'hard';
+  options: string[];
+  correctOptionIndex: number;
+  answer: string;
+  explanation: string;
+  conceptTested?: string;
+}
+
+export interface AdaptivePracticeQuestion {
+  id: string;
+  question: string;
+  difficulty: 'easy' | 'moderate' | 'hard';
+  options: string[];
+  correctOptionIndex: number;
+  answer: string;
+  explanation: string;
+  hint?: string;
+}
+
+export interface AdaptiveTheoryReviewQuestion {
+  id: string;
+  question: string;
+  theoreticalAnswer: string;
+  keyPoints?: string[];
+  boardMarkingTip?: string;
+}
+
+export interface AdaptiveLessonContent {
+  id: string;
+  subject: string;
+  chapter: string;
+  topic: string;
+  studentLevel?: 'Weak' | 'Average' | 'Strong';
+  difficulty_level: string;
+  learning_objectives: string[];
+  subtopics: AdaptiveSubtopic[];
+  theory: string;
+  theory_qa?: AdaptiveTheoryReviewQuestion[];
+  questions: AdaptiveTheoryQuestion[];
+  summary: string[];
+  practice_questions: AdaptivePracticeQuestion[];
+  allocatedMinutes: number;
+  source?: 'ai_generated' | 'curriculum_fallback' | 'cached';
+  createdAt: string;
+}
+
+export interface StudySessionRecord {
+  id: string;
+  userId: string;
+  date: string;
+  subject: string;
+  chapter: string;
+  topic: string;
+  allocatedMinutes: number;
+  actualMinutes: number;
+  startedAt: string;
+  completedAt?: string;
+  status: 'in_progress' | 'completed' | 'abandoned';
+  theoryCompleted: boolean;
+  questionsAttempted: number;
+  questionsCorrect: number;
+  practiceAttempted: number;
+  practiceCorrect: number;
+  difficultyLevel: string;
+  topicUnderstanding: 'Strong' | 'Developing' | 'Needs Revision';
+  taskId?: string;
+}
+
+export interface QuestionAttemptRecord {
+  id: string;
+  userId: string;
+  lessonId: string;
+  questionId: string;
+  type: 'theory' | 'practice';
+  subject: string;
+  chapter: string;
+  topic: string;
+  difficulty: 'easy' | 'moderate' | 'hard';
+  selectedOption: number;
+  isCorrect: boolean;
+  timeSpentSeconds?: number;
+  attemptedAt: string;
 }

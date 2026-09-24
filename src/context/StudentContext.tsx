@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import {
   LearningStyle,
   SubjectType,
@@ -17,8 +17,12 @@ import {
   CurrentLearningContext,
   PreAssessmentResult,
   PreAssessmentQuestion,
-  StudentProfile as AuthStudentProfile
+  StudentProfile as AuthStudentProfile,
+  LearningProfile,
+  StudentLearningPlan,
+  StudySessionRecord
 } from '../types';
+import { recordStudySession, getSavedStudySessions } from '../services/adaptiveLessonService';
 import {
   INITIAL_SUBJECTS,
   INITIAL_RECOMMENDATIONS,
@@ -49,11 +53,12 @@ export interface StudentProfile extends AuthStudentProfile {
     fileName: string;
     fileSize: number;
     uploadedAt: string;
-    storagePath: string;
-    publicUrl: string;
+    storagePath?: string;
+    publicUrl?: string;
     extractedText: string;
     topics: string[];
     analysisComplete: boolean;
+    [key: string]: any;
   }>;
 }
 
@@ -67,6 +72,8 @@ export interface StudentContextType {
   activeTab: string;
   activeSubject: SubjectType;
   lastQuizResult: QuizResult | null;
+  quizHistory: QuizResult[];
+  allStudySessions: StudySessionRecord[];
   notification: { message: string; type: 'success' | 'info' | 'warning' } | null;
   judgeDemoStep: number;
   syllabusData: Record<string, any>;
@@ -95,8 +102,18 @@ export interface StudentContextType {
     topic: string,
     chapterId?: string,
     topicId?: string,
-    difficulty?: DifficultyLevel
+    difficulty?: DifficultyLevel,
+    additional?: {
+      allocatedMinutes?: number;
+      taskId?: string;
+      dayDate?: string;
+      subtopics?: string[];
+      isWeakTopic?: boolean;
+      activityType?: string;
+      studentLevel?: 'Weak' | 'Average' | 'Strong';
+    }
   ) => void;
+  completeTaskAndRecordSession: (session: StudySessionRecord) => Promise<void>;
   startQuizForCurrentTopic: (override?: Partial<CurrentLearningContext>) => void;
   setAcademicProfile: (
     grade: ClassLevel,
@@ -106,6 +123,7 @@ export interface StudentContextType {
     level?: DifficultyLevel
   ) => void;
   resetToDefault: () => void;
+  resetDemo: () => void;
   clearNotification: () => void;
   preAssessmentResult: PreAssessmentResult | null;
   preAssessmentQuestions: PreAssessmentQuestion[];
@@ -114,6 +132,35 @@ export interface StudentContextType {
   recordPreAssessmentResult: (result: PreAssessmentResult) => void;
   clearPreAssessment: () => void;
   setPreAssessmentQuestions: React.Dispatch<React.SetStateAction<PreAssessmentQuestion[]>>;
+  learningProfile: LearningProfile | null;
+  plannerStep: 'subjects' | 'exam-date' | 'chapters' | 'topics' | 'preferences' | 'generate' | 'upload' | 'analysis' | 'review-syllabus';
+  selectedPlannerSubjects: SubjectType[];
+  setPlannerStep: (step: 'subjects' | 'exam-date' | 'chapters' | 'topics' | 'preferences' | 'generate' | 'upload' | 'analysis' | 'review-syllabus') => void;
+  setSelectedPlannerSubjects: React.Dispatch<React.SetStateAction<SubjectType[]>>;
+  recordLearningProfile: (profile: LearningProfile) => void;
+  clearLearningProfile: () => void;
+  activeLearningPlan: StudentLearningPlan | null;
+  recordLearningPlan: (plan: StudentLearningPlan) => void;
+  clearLearningPlan: () => void;
+  toggleStudyTaskCompletion: (dayDate: string, taskId: string) => void;
+  progressMetrics: RealProgressMetrics;
+}
+
+export interface RealProgressMetrics {
+  todayCompletedTasks: number;
+  todayTotalTasks: number;
+  todayProgressPct: number;
+  weekCompletedTasks: number;
+  weekTotalTasks: number;
+  weekProgressPct: number;
+  overallCompletedTasks: number;
+  overallTotalTasks: number;
+  overallProgressPct: number;
+  totalQuizzesTaken: number;
+  averageQuizScorePct: number;
+  totalStudyMinutes: number;
+  totalTopicsCount: number;
+  completedTopicsCount: number;
 }
 
 const StudentContext = createContext<StudentContextType | undefined>(undefined);
@@ -124,14 +171,16 @@ export const StudentProvider: React.FC<{ children: React.ReactNode }> = ({ child
   // Initialize student profile with data from auth user (if available) and defaults for client-specific fields
   const [student, setStudent] = useState<StudentProfile>({
     // Auth fields (from user or defaults)
-    id: user ? user.id : 'guest_student',
-    name: user ? user.name : 'Khushi Dixit',
-    email: user ? user.email : '',
-    grade: user ? user.grade : '10th',
+    id: user ? user.id : 'user-demo-sally-sharma',
+    name: user ? user.name : 'Sally Sharma',
+    email: user ? user.email : 'sally.demo@example.com',
+    grade: user ? user.grade : 'Class 10',
+    board: user ? (user.board || 'CBSE') : 'CBSE',
+    stream: user ? (user.stream || 'Not applicable') : 'Not applicable',
     level: user ? user.level : 'Intermediate',
-    preferredSubjects: user ? user.preferredSubjects : ['Mathematics', 'Science'],
+    preferredSubjects: user ? user.preferredSubjects : ['Mathematics', 'Science', 'English', 'Computer Science', 'Social Science'],
     preferredStyle: user ? user.preferredStyle : 'Simple',
-    isDemo: user ? user.isDemo : false,
+    isDemo: user ? user.isDemo : true,
     emailVerified: user ? user.emailVerified : true,
     createdAt: user ? (user.createdAt || user.created_at || new Date().toISOString()) : new Date().toISOString(),
     // Client-specific fields with defaults
@@ -150,6 +199,8 @@ export const StudentProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [activeSubject, setActiveSubjectState] = useState<SubjectType>('Mathematics');
   const [lastQuizResult, setLastQuizResult] = useState<QuizResult | null>(null);
+  const [quizHistory, setQuizHistory] = useState<QuizResult[]>([]);
+  const [allStudySessions, setAllStudySessions] = useState<StudySessionRecord[]>([]);
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'info' | 'warning' } | null>(null);
   const [judgeDemoStep, setJudgeDemoStep] = useState<number>(0);
   const [syllabusData, setSyllabusData] = useState<Record<string, any>>({});
@@ -158,6 +209,12 @@ export const StudentProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [preAssessmentResult, setPreAssessmentResult] = useState<PreAssessmentResult | null>(null);
   const [preAssessmentQuestions, setPreAssessmentQuestions] = useState<PreAssessmentQuestion[]>([]);
   const [isGeneratingAssessment, setIsGeneratingAssessment] = useState<boolean>(false);
+
+  // Learning Path Planner & AI Syllabus Analysis state
+  const [learningProfile, setLearningProfile] = useState<LearningProfile | null>(null);
+  const [plannerStep, setPlannerStep] = useState<'subjects' | 'exam-date' | 'chapters' | 'topics' | 'preferences' | 'generate' | 'upload' | 'analysis' | 'review-syllabus'>('subjects');
+  const [selectedPlannerSubjects, setSelectedPlannerSubjects] = useState<SubjectType[]>([]);
+  const [activeLearningPlan, setActiveLearningPlan] = useState<StudentLearningPlan | null>(null);
 
   // Material upload state
   const [uploadedMaterial, setUploadedMaterial] = useState<ParsedMaterial | null>(null);
@@ -193,8 +250,72 @@ export const StudentProvider: React.FC<{ children: React.ReactNode }> = ({ child
       setUploadedMaterial(parsed);
       setUploadState('ready');
 
+      // Seamlessly register parsed topics into student syllabus data for learning path planning
+      const textToScan = `${file.name} ${parsed.extractedText.slice(0, 2000)}`.toLowerCase();
+      let inferredSubject: SubjectType = activeSubject || 'Science';
+      if (/math|algebra|geometry|calculus|trigonometry|equation|fraction|arithmetic|polynomial/i.test(textToScan)) {
+        inferredSubject = 'Mathematics';
+      } else if (/physics|chem|bio|science|reaction|cell|atom|motion|organ|photosynthesis|acid|base/i.test(textToScan)) {
+        inferredSubject = 'Science';
+      } else if (/computer|program|python|code|database|algorithm|software|network|loop|array/i.test(textToScan)) {
+        inferredSubject = 'Computer Science';
+      } else if (/history|geography|civics|economics|democracy|constitution|empire|resource|parliament/i.test(textToScan)) {
+        inferredSubject = 'Social Science';
+      } else if (/english|grammar|prose|poem|poetry|literature|comprehension|essay|tense/i.test(textToScan)) {
+        inferredSubject = 'English';
+      }
+
+      const topicsList = parsed.topics.map(t => t.title);
+      const examFocusedTopics: Record<string, string[]> = {};
+      const structuredChapters = parsed.topics.map((t, idx) => {
+        const subList = t.concepts ? t.concepts.split(/[,.;\n]/).map(s => s.trim()).filter(s => s.length > 3).slice(0, 5) : [];
+        const fullTopics = subList.length > 0 ? [t.title, ...subList] : [t.title];
+        examFocusedTopics[t.title] = fullTopics;
+        return {
+          chapterId: `ch_${inferredSubject.toLowerCase().replace(/\s+/g, '_').slice(0, 4)}_${idx + 1}`,
+          chapterName: t.title,
+          subject: inferredSubject,
+          topics: fullTopics,
+          sourceMethod: 'heading_detection'
+        };
+      });
+
+      const syllabusEntry = {
+        subject: inferredSubject,
+        fileName: file.name,
+        fileSize: file.size,
+        uploadedAt: new Date().toISOString(),
+        extractedText: parsed.extractedText.slice(0, 5000),
+        topics: topicsList,
+        chapters: structuredChapters,
+        examFocusedTopics,
+        storagePath: '',
+        publicUrl: '',
+        analysisComplete: true
+      };
+
+      setStudent(prev => {
+        const updated = {
+          ...prev,
+          syllabusData: {
+            ...(prev.syllabusData || {}),
+            [inferredSubject]: syllabusEntry
+          },
+          syllabusUploaded: true
+        };
+        try {
+          const key = user?.id ? `student_profile_${user.id}` : 'student_profile_guest';
+          localStorage.setItem(key, JSON.stringify(updated));
+        } catch (e) {}
+        return updated;
+      });
+      setSyllabusData(prev => ({
+        ...prev,
+        [inferredSubject]: syllabusEntry
+      }));
+
       setNotification({
-        message: `Successfully analyzed "${file.name}" (${parsed.wordCount} words, ${parsed.topics.length} topics found). Connected to AI Tutor!`,
+        message: `Successfully analyzed "${file.name}" (${parsed.wordCount} words, ${parsed.topics.length} topics found). Connected to AI Tutor & Study Planner!`,
         type: 'success'
       });
 
@@ -265,7 +386,16 @@ export const StudentProvider: React.FC<{ children: React.ReactNode }> = ({ child
     topic: string,
     chapterId?: string,
     topicId?: string,
-    difficulty?: DifficultyLevel
+    difficulty?: DifficultyLevel,
+    additional?: {
+      allocatedMinutes?: number;
+      taskId?: string;
+      dayDate?: string;
+      subtopics?: string[];
+      isWeakTopic?: boolean;
+      activityType?: string;
+      studentLevel?: 'Weak' | 'Average' | 'Strong';
+    }
   ) => {
     setActiveSubjectState(subject);
     setCurrentLearningContext((prev) => ({
@@ -275,7 +405,14 @@ export const StudentProvider: React.FC<{ children: React.ReactNode }> = ({ child
       topic,
       chapterId: chapterId || prev.chapterId,
       topicId: topicId || prev.topicId,
-      difficulty: difficulty || prev.difficulty
+      difficulty: difficulty || prev.difficulty,
+      allocatedMinutes: additional?.allocatedMinutes ?? prev.allocatedMinutes,
+      taskId: additional?.taskId ?? prev.taskId,
+      dayDate: additional?.dayDate ?? prev.dayDate,
+      subtopics: additional?.subtopics ?? prev.subtopics,
+      isWeakTopic: additional?.isWeakTopic ?? prev.isWeakTopic,
+      activityType: additional?.activityType ?? prev.activityType,
+      studentLevel: additional?.studentLevel ?? prev.studentLevel
     }));
   };
 
@@ -516,11 +653,63 @@ export const StudentProvider: React.FC<{ children: React.ReactNode }> = ({ child
       } catch {
         setPreAssessmentResult(null);
       }
+
+      // Restore learning profile from localStorage
+      const userProfileKey = `gurumitra_learning_profile_${user.id}`;
+      try {
+        const savedProfile = localStorage.getItem(userProfileKey);
+        if (savedProfile) {
+          setLearningProfile(JSON.parse(savedProfile));
+        } else {
+          setLearningProfile(null);
+        }
+      } catch {
+        setLearningProfile(null);
+      }
+      // Restore learning plan from localStorage
+      const userPlanKey = `gurumitra_learning_plan_${user.id}`;
+      try {
+        const savedPlan = localStorage.getItem(userPlanKey);
+        if (savedPlan) {
+          setActiveLearningPlan(JSON.parse(savedPlan));
+        } else {
+          setActiveLearningPlan(null);
+        }
+      } catch {
+        setActiveLearningPlan(null);
+      }
+
+      // Restore quiz history from localStorage
+      const userQuizKey = `gurumitra_quiz_history_${user.id}`;
+      try {
+        const savedQuizzes = localStorage.getItem(userQuizKey);
+        if (savedQuizzes) {
+          const parsed = JSON.parse(savedQuizzes);
+          setQuizHistory(parsed);
+          if (parsed.length > 0) {
+            setLastQuizResult(parsed[0]);
+          }
+        } else {
+          setQuizHistory([]);
+          setLastQuizResult(null);
+        }
+      } catch {
+        setQuizHistory([]);
+        setLastQuizResult(null);
+      }
+
+      // Restore study sessions
+      setAllStudySessions(getSavedStudySessions(user.id));
     } else {
       // User logged out — reset syllabus and assessment state completely
       setSyllabusData({});
       setStudent((prev) => ({ ...prev, syllabusData: {}, syllabusUploaded: false }));
       setPreAssessmentResult(null);
+      setLearningProfile(null);
+      setActiveLearningPlan(null);
+      setQuizHistory([]);
+      setAllStudySessions([]);
+      setLastQuizResult(null);
     }
   }, [user]);
 
@@ -584,6 +773,252 @@ export const StudentProvider: React.FC<{ children: React.ReactNode }> = ({ child
     } catch {}
   };
 
+  const recordLearningProfile = (profile: LearningProfile) => {
+    setLearningProfile(profile);
+    const userId = user?.id || 'guest_student';
+    try {
+      localStorage.setItem(`gurumitra_learning_profile_${userId}`, JSON.stringify(profile));
+    } catch (e) {
+      console.warn('Could not persist learning profile to localStorage:', e);
+    }
+  };
+
+  const clearLearningProfile = () => {
+    setLearningProfile(null);
+    const userId = user?.id || 'guest_student';
+    try {
+      localStorage.removeItem(`gurumitra_learning_profile_${userId}`);
+    } catch {}
+  };
+
+  const recordLearningPlan = (plan: StudentLearningPlan) => {
+    setActiveLearningPlan(plan);
+    const userId = user?.id || 'guest_student';
+    try {
+      localStorage.setItem(`gurumitra_learning_plan_${userId}`, JSON.stringify(plan));
+    } catch (e) {
+      console.warn('Could not persist learning plan to localStorage:', e);
+    }
+  };
+
+  const clearLearningPlan = () => {
+    setActiveLearningPlan(null);
+    const userId = user?.id || 'guest_student';
+    try {
+      localStorage.removeItem(`gurumitra_learning_plan_${userId}`);
+    } catch {}
+  };
+
+  const toggleStudyTaskCompletion = (dayDate: string, taskId: string) => {
+    if (!activeLearningPlan) return;
+
+    let isCompletedNow = false;
+    const updatedDailyPlans = activeLearningPlan.dailyPlans.map(day => {
+      if (day.date !== dayDate) return day;
+      const updatedTasks = day.tasks.map(t => {
+        if (t.id === taskId) {
+          isCompletedNow = !t.completed;
+          return {
+            ...t,
+            completed: isCompletedNow,
+            completedAt: isCompletedNow ? new Date().toISOString() : undefined
+          };
+        }
+        return t;
+      });
+      const allDone = updatedTasks.length > 0 && updatedTasks.every(t => t.completed);
+      return {
+        ...day,
+        tasks: updatedTasks,
+        isCompleted: allDone
+      };
+    });
+
+    const updatedPlan: StudentLearningPlan = {
+      ...activeLearningPlan,
+      dailyPlans: updatedDailyPlans,
+      updatedAt: new Date().toISOString()
+    };
+
+    recordLearningPlan(updatedPlan);
+  };
+
+  const completeTaskAndRecordSession = async (session: StudySessionRecord) => {
+    const userId = user?.id || 'guest_student';
+    // 1. Record the session persistently with user scoping
+    await recordStudySession(session, userId);
+    setAllStudySessions(getSavedStudySessions(userId));
+
+    // 2. Mark the corresponding daily task as completed in activeLearningPlan
+    if (activeLearningPlan) {
+      let targetTaskId = session.taskId;
+      if (!targetTaskId) {
+        for (const day of activeLearningPlan.dailyPlans) {
+          const match = day.tasks.find(t => !t.completed && t.subject === session.subject && (t.topic === session.topic || t.chapter === session.chapter));
+          if (match) {
+            targetTaskId = match.id;
+            break;
+          }
+        }
+      }
+
+      if (targetTaskId) {
+        const updatedDailyPlans = activeLearningPlan.dailyPlans.map(day => {
+          const hasTask = day.tasks.some(t => t.id === targetTaskId);
+          if (!hasTask) return day;
+
+          const updatedTasks = day.tasks.map(t => {
+            if (t.id === targetTaskId) {
+              return {
+                ...t,
+                completed: true,
+                completedAt: session.completedAt || new Date().toISOString()
+              };
+            }
+            return t;
+          });
+
+          const allDone = updatedTasks.length > 0 && updatedTasks.every(t => t.completed);
+          return {
+            ...day,
+            tasks: updatedTasks,
+            isCompleted: allDone
+          };
+        });
+
+        const updatedPlan: StudentLearningPlan = {
+          ...activeLearningPlan,
+          dailyPlans: updatedDailyPlans,
+          updatedAt: new Date().toISOString()
+        };
+
+        recordLearningPlan(updatedPlan);
+      }
+    }
+  };
+
+  // Real progress metrics calculation derived from actual daily task completions and quiz history
+  const progressMetrics = useMemo<RealProgressMetrics>(() => {
+    const totalQuizzesTaken = quizHistory.length;
+    const averageQuizScorePct = quizHistory.length > 0
+      ? Math.round(quizHistory.reduce((acc, q) => acc + q.accuracy, 0) / quizHistory.length)
+      : (student.overallAccuracy || 0);
+    const totalStudyMinutes = allStudySessions.reduce((acc, s) => acc + (s.actualMinutes || s.allocatedMinutes || 0), 0) + (quizHistory.length * 10);
+    const totalTopicsCount = subjects.reduce((acc, s) => acc + s.totalTopics, 0);
+    const completedTopicsCount = subjects.reduce((acc, s) => acc + s.completedTopics, 0);
+
+    if (!activeLearningPlan || !activeLearningPlan.dailyPlans || activeLearningPlan.dailyPlans.length === 0) {
+      return {
+        todayCompletedTasks: 0,
+        todayTotalTasks: 0,
+        todayProgressPct: 0,
+        weekCompletedTasks: 0,
+        weekTotalTasks: 0,
+        weekProgressPct: 0,
+        overallCompletedTasks: 0,
+        overallTotalTasks: 0,
+        overallProgressPct: 0,
+        totalQuizzesTaken,
+        averageQuizScorePct,
+        totalStudyMinutes,
+        totalTopicsCount,
+        completedTopicsCount
+      };
+    }
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    const allDays = activeLearningPlan.dailyPlans;
+
+    // All scheduled tasks
+    const allTasks = allDays.flatMap(d => d.tasks);
+    const overallTotalTasks = allTasks.length;
+    const overallCompletedTasks = allTasks.filter(t => t.completed).length;
+    const overallProgressPct = overallTotalTasks > 0 ? Math.round((overallCompletedTasks / overallTotalTasks) * 100) : 0;
+
+    // Today's tasks (matched to current date or active day)
+    let todayPlan = allDays.find(d => d.date === todayStr);
+    if (!todayPlan && allDays.length > 0) {
+      todayPlan = allDays.find(d => d.tasks.some(t => !t.completed)) || allDays[0];
+    }
+    const todayTasks = todayPlan ? todayPlan.tasks : [];
+    const todayTotalTasks = todayTasks.length;
+    const todayCompletedTasks = todayTasks.filter(t => t.completed).length;
+    const todayProgressPct = todayTotalTasks > 0 ? Math.round((todayCompletedTasks / todayTotalTasks) * 100) : 0;
+
+    // Current week's tasks (first 7 days runway)
+    const weekPlans = allDays.slice(0, 7);
+    const weekTasks = weekPlans.flatMap(d => d.tasks);
+    const weekTotalTasks = weekTasks.length;
+    const weekCompletedTasks = weekTasks.filter(t => t.completed).length;
+    const weekProgressPct = weekTotalTasks > 0 ? Math.round((weekCompletedTasks / weekTotalTasks) * 100) : 0;
+
+    return {
+      todayCompletedTasks,
+      todayTotalTasks,
+      todayProgressPct,
+      weekCompletedTasks,
+      weekTotalTasks,
+      weekProgressPct,
+      overallCompletedTasks,
+      overallTotalTasks,
+      overallProgressPct,
+      totalQuizzesTaken,
+      averageQuizScorePct,
+      totalStudyMinutes,
+      totalTopicsCount,
+      completedTopicsCount
+    };
+  }, [activeLearningPlan, quizHistory, allStudySessions, subjects, student.overallAccuracy]);
+
+  // Recalculate real subject progress whenever learning plan or pre-assessment updates
+  useEffect(() => {
+    if (!activeLearningPlan || !activeLearningPlan.dailyPlans) return;
+
+    const allTasks = activeLearningPlan.dailyPlans.flatMap(d => d.tasks);
+    if (allTasks.length === 0) return;
+
+    setSubjects(prev =>
+      prev.map(sub => {
+        const subTasks = allTasks.filter(t => t.subject.toLowerCase() === sub.name.toLowerCase());
+        if (subTasks.length === 0) return sub;
+
+        const completedCount = subTasks.filter(t => t.completed).length;
+        const totalCount = subTasks.length;
+        const calculatedProgress = Math.round((completedCount / totalCount) * 100);
+
+        // Derive mastery from preAssessment diagnostic or active performance
+        let calculatedAccuracy = sub.accuracy;
+        if (preAssessmentResult) {
+          const subQs = preAssessmentResult.questionPerformance.filter(
+            q => q.subject.toLowerCase() === sub.name.toLowerCase()
+          );
+          if (subQs.length > 0) {
+            calculatedAccuracy = Math.round((subQs.filter(q => q.isCorrect).length / subQs.length) * 100);
+          }
+        }
+
+        return {
+          ...sub,
+          progress: calculatedProgress,
+          completedTopics: completedCount,
+          totalTopics: totalCount,
+          accuracy: calculatedAccuracy
+        };
+      })
+    );
+
+    // Update overallProgress on student profile
+    const totalScheduled = allTasks.length;
+    const totalDone = allTasks.filter(t => t.completed).length;
+    const calculatedOverall = totalScheduled > 0 ? Math.round((totalDone / totalScheduled) * 100) : 0;
+
+    setStudent(prev => ({
+      ...prev,
+      overallProgress: calculatedOverall,
+      completedLessons: totalDone
+    }));
+  }, [activeLearningPlan, preAssessmentResult]);
+
   const clearNotification = () => setNotification(null);
 
   const setPreferredStyle = (style: LearningStyle) => {
@@ -619,9 +1054,27 @@ export const StudentProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   // CORE USP: DYNAMIC ADAPTATION ENGINE
   const recordQuizResult = (result: QuizResult) => {
-    setLastQuizResult(result);
+    const enrichedResult: QuizResult = {
+      ...result,
+      id: result.id || `quiz_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      timestamp: result.timestamp || new Date().toISOString()
+    };
 
-    const { accuracy, score, totalQuestions, subject, topic } = result;
+    setLastQuizResult(enrichedResult);
+
+    const userId = user?.id || 'guest_student';
+    const userQuizKey = `gurumitra_quiz_history_${userId}`;
+    setQuizHistory((prev) => {
+      const updated = [enrichedResult, ...prev.filter(q => q.id !== enrichedResult.id)].slice(0, 50);
+      try {
+        localStorage.setItem(userQuizKey, JSON.stringify(updated));
+      } catch (e) {
+        console.warn('Could not persist quiz history:', e);
+      }
+      return updated;
+    });
+
+    const { accuracy, score, totalQuestions, subject, topic } = enrichedResult;
 
     let newLevel: DifficultyLevel = student.level;
     let adaptationMsg = '';
@@ -783,14 +1236,16 @@ export const StudentProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const resetToDefault = () => {
     setStudent({
       // Auth fields (from user or defaults)
-      id: user ? user.id : 'guest_student',
-      name: user ? user.name : 'Khushi Dixit',
-      email: user ? user.email : '',
-      grade: user ? user.grade : '10th',
+      id: user ? user.id : 'user-demo-sally-sharma',
+      name: user ? user.name : 'Sally Sharma',
+      email: user ? user.email : 'sally.demo@example.com',
+      grade: user ? user.grade : 'Class 10',
+      board: user ? (user.board || 'CBSE') : 'CBSE',
+      stream: user ? (user.stream || 'Not applicable') : 'Not applicable',
       level: user ? user.level : 'Intermediate',
-      preferredSubjects: user ? user.preferredSubjects : ['Mathematics', 'Science'],
+      preferredSubjects: user ? user.preferredSubjects : ['Mathematics', 'Science', 'English', 'Computer Science', 'Social Science'],
       preferredStyle: user ? user.preferredStyle : 'Simple',
-      isDemo: user ? user.isDemo : false,
+      isDemo: user ? user.isDemo : true,
       emailVerified: user ? user.emailVerified : true,
       createdAt: user ? (user.createdAt || user.created_at || new Date().toISOString()) : new Date().toISOString(),
       // Client-specific fields with defaults
@@ -806,12 +1261,74 @@ export const StudentProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setLearningPath(INITIAL_LEARNING_PATH);
     setActivities(INITIAL_ACTIVITIES);
     setLastQuizResult(null);
+    setQuizHistory([]);
+    setAllStudySessions([]);
     setJudgeDemoStep(0);
     setUploadedMaterial(null);
     setUploadState('idle');
     setUploadError(null);
     setNotification({
-      message: 'Demo state reset to initial baseline successfully!',
+      message: 'State reset to initial baseline successfully!',
+      type: 'info'
+    });
+  };
+
+  const resetDemo = () => {
+    const demoId = user?.id || 'user-demo-sally-sharma';
+    const keysToRemove = [
+      `gurumitra_syllabus_data_${demoId}`,
+      `gurumitra_quiz_history_${demoId}`,
+      `gurumitra_study_sessions_${demoId}`,
+      `gurumitra_pre_assessment_${demoId}`,
+      `gurumitra_learning_plan_${demoId}`,
+      `gurumitra_learning_profile_${demoId}`,
+      `student_profile_${demoId}`
+    ];
+    keysToRemove.forEach(k => {
+      try {
+        localStorage.removeItem(k);
+      } catch {}
+    });
+
+    setStudent({
+      id: demoId,
+      name: 'Sally Sharma',
+      email: 'sally.demo@example.com',
+      grade: 'Class 10',
+      board: 'CBSE',
+      stream: 'Not applicable',
+      level: 'Intermediate',
+      preferredSubjects: ['Mathematics', 'Science', 'English', 'Computer Science', 'Social Science'],
+      preferredStyle: 'Simple',
+      isDemo: true,
+      emailVerified: true,
+      createdAt: new Date().toISOString(),
+      streak: 4,
+      totalPoints: 1420,
+      rank: 76,
+      syllabusUploaded: false,
+      syllabusData: {}
+    });
+
+    setSubjects(INITIAL_SUBJECTS);
+    setRecommendations(INITIAL_RECOMMENDATIONS);
+    setStudyPlan(INITIAL_STUDY_PLAN);
+    setLearningPath(INITIAL_LEARNING_PATH);
+    setActivities(INITIAL_ACTIVITIES);
+    setLastQuizResult(null);
+    setQuizHistory([]);
+    setAllStudySessions([]);
+    setPreAssessmentResult(null);
+    setLearningProfile(null);
+    setActiveLearningPlan(null);
+    setJudgeDemoStep(0);
+    setUploadedMaterial(null);
+    setUploadState('idle');
+    setUploadError(null);
+    setActiveTab('dashboard');
+
+    setNotification({
+      message: 'Demo mode reset to fresh presentation baseline! Ready for complete onboarding flow.',
       type: 'info'
     });
   };
@@ -828,6 +1345,8 @@ export const StudentProvider: React.FC<{ children: React.ReactNode }> = ({ child
         activeTab,
         activeSubject,
         lastQuizResult,
+        quizHistory,
+        allStudySessions,
         notification,
         judgeDemoStep,
         syllabusData,
@@ -854,6 +1373,7 @@ export const StudentProvider: React.FC<{ children: React.ReactNode }> = ({ child
         startQuizForCurrentTopic,
         setAcademicProfile,
         resetToDefault,
+        resetDemo,
         clearNotification,
         preAssessmentResult,
         preAssessmentQuestions,
@@ -861,7 +1381,20 @@ export const StudentProvider: React.FC<{ children: React.ReactNode }> = ({ child
         setIsGeneratingAssessment,
         recordPreAssessmentResult,
         clearPreAssessment,
-        setPreAssessmentQuestions
+        setPreAssessmentQuestions,
+        learningProfile,
+        plannerStep,
+        selectedPlannerSubjects,
+        setPlannerStep,
+        setSelectedPlannerSubjects,
+        recordLearningProfile,
+        clearLearningProfile,
+        activeLearningPlan,
+        recordLearningPlan,
+        clearLearningPlan,
+        toggleStudyTaskCompletion,
+        completeTaskAndRecordSession,
+        progressMetrics
       }}
     >
       {children}

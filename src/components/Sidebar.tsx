@@ -20,17 +20,17 @@ export const Sidebar: React.FC = () => {
   const { activeTab, setActiveTab, student } = useStudent();
 
   const navItems = [
-    { id: 'dashboard', label: 'Home', icon: Home, badge: null },
-    { id: 'pre-assessment', label: 'Pre-Assessment', icon: Sparkles, badge: 'Diagnostic' },
-    { id: 'tutor', label: 'AI Tutor', icon: Bot, badge: 'Multi-Subject' },
-    { id: 'subjects', label: 'Subjects', icon: BookOpen, badge: null },
+    { id: 'dashboard', label: 'Dashboard', icon: Home, badge: null },
     { id: 'adaptive', label: 'Adaptive Study', icon: BrainCircuit, badge: 'Live' },
-    { id: 'quiz', label: 'Quiz & Assess', icon: HelpCircle, badge: null },
+    { id: 'quiz', label: 'Quizzes', icon: HelpCircle, badge: 'Adaptive' },
+    { id: 'pre-assessment', label: 'Assessments', icon: Sparkles, badge: 'Diagnostic' },
     { id: 'analytics', label: 'Progress & Analytics', icon: BarChart3, badge: null },
-    { id: 'recommendations', label: 'Recommendations', icon: Lightbulb, badge: null },
-    { id: 'learning-path', label: 'Learning Path', icon: GitFork, badge: null },
-    { id: 'upload', label: 'Upload Material', icon: UploadCloud, badge: 'AI Scan' },
-    { id: 'profile', label: 'Settings & Profile', icon: Settings, badge: null },
+    { id: 'recommendations', label: 'Recommendations', icon: Lightbulb, badge: 'AI' },
+    { id: 'learning-path', label: 'Study Plan & Path', icon: GitFork, badge: null },
+    { id: 'tutor', label: 'AI Tutor', icon: Bot, badge: '24/7' },
+    { id: 'subjects', label: 'Curriculum Subjects', icon: BookOpen, badge: null },
+    { id: 'upload', label: 'Upload Syllabus / PDF', icon: UploadCloud, badge: null },
+    { id: 'profile', label: 'Profile & Settings', icon: Settings, badge: null },
   ];
 
   return (

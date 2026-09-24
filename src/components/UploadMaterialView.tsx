@@ -11,7 +11,8 @@ import {
   RotateCcw,
   AlertCircle,
   FileCheck,
-  MessageSquareQuote
+  MessageSquareQuote,
+  BookOpen
 } from 'lucide-react';
 import { useStudent } from '../context/StudentContext';
 import { getStoredGeminiKey } from '../services/preAssessmentService';
@@ -25,7 +26,8 @@ export const UploadMaterialView: React.FC = () => {
     uploadError,
     processAndSetFile,
     removeUploadedMaterial,
-    clearUploadError
+    clearUploadError,
+    setPlannerStep
   } = useStudent();
 
   const [selectedFormat, setSelectedFormat] = useState<'PDF' | 'Notes' | 'DOCX'>('PDF');
@@ -521,9 +523,27 @@ export const UploadMaterialView: React.FC = () => {
 
               <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                 <button
-                  onClick={() => setActiveTab('pre-assessment')}
+                  onClick={() => {
+                    setPlannerStep('chapters');
+                    setActiveTab('learning-path');
+                  }}
                   className="btn btn-primary"
-                  style={{ padding: '10px 20px', display: 'flex', alignItems: 'center', gap: '8px' }}
+                  style={{
+                    padding: '10px 20px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    backgroundColor: '#4F46E5',
+                    color: '#FFFFFF'
+                  }}
+                >
+                  <BookOpen size={16} />
+                  <span>Create Study Plan from this Topic</span>
+                </button>
+                <button
+                  onClick={() => setActiveTab('pre-assessment')}
+                  className="btn btn-outline"
+                  style={{ padding: '10px 20px', display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: '#FFFFFF' }}
                 >
                   <Sparkles size={16} />
                   <span>Start Pre-Assessment</span>

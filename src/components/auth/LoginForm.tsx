@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Mail, Lock, Eye, EyeOff, AlertCircle, ArrowRight, Loader2, Info } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, AlertCircle, ArrowRight, Loader2, Info, Sparkles } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
 interface LoginFormProps {
@@ -11,7 +11,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({
   onSwitchToSignUp,
   onSwitchToForgotPassword
 }) => {
-  const { signIn, authError, clearError, isConfigured } = useAuth();
+  const { signIn, loginAsDemo, authError, clearError, isConfigured } = useAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -324,6 +324,66 @@ export const LoginForm: React.FC<LoginFormProps> = ({
             </>
           )}
         </button>
+
+        {/* Divider */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          margin: '4px 0',
+          color: '#94A3B8',
+          fontSize: '0.8rem'
+        }}>
+          <div style={{ flex: 1, height: '1px', backgroundColor: '#E2E8F0' }} />
+          <span>OR FOR PRESENTATION / DEMO</span>
+          <div style={{ flex: 1, height: '1px', backgroundColor: '#E2E8F0' }} />
+        </div>
+
+        {/* One-Click Presentation Demo Login Button */}
+        <button
+          type="button"
+          disabled={isSubmitting}
+          onClick={async () => {
+            setIsSubmitting(true);
+            try {
+              await loginAsDemo();
+            } finally {
+              setIsSubmitting(false);
+            }
+          }}
+          style={{
+            width: '100%',
+            padding: '12px',
+            borderRadius: '12px',
+            border: '1.5px solid #FCD34D',
+            background: 'linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%)',
+            color: '#92400E',
+            fontWeight: 800,
+            fontSize: '0.92rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+            cursor: 'pointer',
+            boxShadow: '0 4px 12px rgba(245, 158, 11, 0.15)',
+            transition: 'all 0.2s ease'
+          }}
+        >
+          <Sparkles size={17} color="#D97706" />
+          <span>Quick Demo Login (Sally Sharma • Class 10 CBSE)</span>
+        </button>
+
+        <div style={{
+          padding: '8px 12px',
+          borderRadius: '8px',
+          backgroundColor: '#F8FAFC',
+          border: '1px solid #E2E8F0',
+          fontSize: '0.74rem',
+          color: '#64748B',
+          textAlign: 'center'
+        }}>
+          Demo Email: <strong>sally.demo@example.com</strong> • Password: <strong>Demo@123</strong>
+        </div>
       </form>
 
       {/* Sign Up Link */}

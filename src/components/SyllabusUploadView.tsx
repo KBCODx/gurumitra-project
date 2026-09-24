@@ -181,6 +181,46 @@ export const SyllabusUploadView: React.FC = () => {
     }
   };
 
+  const handleAutoLoadDemoSyllabus = async () => {
+    setIsCompleting(true);
+    try {
+      let demoPdfFile: File | null = null;
+      try {
+        const resp = await fetch('/sample-syllabus/Class_10_Science_Chemistry_Main_Topics.pdf');
+        if (resp.ok) {
+          const blob = await resp.blob();
+          demoPdfFile = new File([blob], 'Class_10_CBSE_Curriculum_Syllabus.pdf', { type: 'application/pdf' });
+        }
+      } catch (err) {
+        console.warn('Could not fetch sample syllabus blob:', err);
+      }
+
+      const targetSubjects = preferredSubjects.length > 0
+        ? preferredSubjects
+        : (['Mathematics', 'Science', 'English', 'Computer Science', 'Social Science'] as SubjectType[]);
+
+      const filesToSubmit: Record<string, any> = {};
+      targetSubjects.forEach((subject) => {
+        filesToSubmit[subject] = {
+          file: demoPdfFile || new File([''], `${subject}_Class_10_CBSE_Syllabus.pdf`, { type: 'application/pdf' }),
+          name: `${subject}_Class_10_CBSE_Syllabus.pdf`,
+          size: 27209,
+          type: 'application/pdf',
+          uploadedAt: new Date().toISOString()
+        };
+      });
+
+      await new Promise(r => setTimeout(r, 600));
+      await completeSyllabusSetup(filesToSubmit);
+      setIsCompleting(false);
+      setActiveTab('syllabus-analysis');
+      setActiveSubject(targetSubjects[0]);
+    } catch (e) {
+      setIsCompleting(false);
+      alert('Error loading demo syllabus. Please select a PDF file manually.');
+    }
+  };
+
   return (
     <div style={{
       minHeight: '100vh',
@@ -192,7 +232,7 @@ export const SyllabusUploadView: React.FC = () => {
     }}>
       <div style={{ maxWidth: '1100px', width: '100%' }}>
         {/* Header Section */}
-        <div style={{ textAlign: 'center', marginBottom: '36px' }}>
+        <div style={{ textAlign: 'center', marginBottom: '28px' }}>
           <div style={{
             width: '72px',
             height: '72px',
@@ -243,11 +283,36 @@ export const SyllabusUploadView: React.FC = () => {
             fontSize: '1.05rem',
             color: 'var(--text-muted)',
             maxWidth: '640px',
-            margin: '0 auto',
+            margin: '0 auto 20px',
             lineHeight: '1.6'
           }}>
             Upload your syllabus for each subject so GuruMitra can create a personalized adaptive plan just for you.
           </p>
+
+          {/* Quick Demo Syllabus Helper */}
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '10px' }}>
+            <button
+              onClick={handleAutoLoadDemoSyllabus}
+              disabled={isCompleting}
+              className="btn"
+              style={{
+                background: 'linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%)',
+                color: '#FFFFFF',
+                padding: '12px 28px',
+                borderRadius: '999px',
+                fontWeight: 700,
+                fontSize: '0.9rem',
+                boxShadow: '0 8px 20px -4px rgba(79, 70, 229, 0.4)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                cursor: 'pointer'
+              }}
+            >
+              <Sparkles size={16} />
+              <span>{isCompleting ? 'Loading & Analyzing CBSE Syllabus...' : '✨ 1-Click: Auto-Load Class 10 CBSE Syllabus (Demo Mode)'}</span>
+            </button>
+          </div>
         </div>
 
         {/* Subject Tabs */}

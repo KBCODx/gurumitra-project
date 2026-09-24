@@ -17,6 +17,7 @@ interface AuthContextType {
   resetPassword: (email: string) => Promise<{ success: boolean; message: string; error?: string }>;
   clearError: () => void;
   demoCredentials: { email: string; password: string };
+  loginAsDemo: () => Promise<{ success: boolean; error?: string }>;
   resendVerificationEmail: () => Promise<{ success: boolean; error?: string }>;
   pendingVerificationEmail: string | null;
 }
@@ -26,11 +27,13 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const SESSION_STORAGE_KEY = 'gurumitra_auth_session';
 const REGISTERED_USERS_KEY = 'gurumitra_registered_users';
 
-const DEMO_USER: AuthUser = {
-  id: 'user-demo-khushi',
-  name: 'Khushi Dixit',
-  email: 'demo@student.com',
-  grade: '10th',
+export const DEMO_USER: AuthUser = {
+  id: 'user-demo-sally-sharma',
+  name: 'Sally Sharma',
+  email: 'sally.demo@example.com',
+  grade: 'Class 10',
+  board: 'CBSE',
+  stream: 'Not applicable',
   level: 'Intermediate',
   preferredSubjects: ['Mathematics', 'Science', 'English', 'Computer Science', 'Social Science'],
   preferredStyle: 'Simple',
@@ -39,7 +42,7 @@ const DEMO_USER: AuthUser = {
   createdAt: new Date().toISOString()
 };
 
-const DEMO_PASSWORD = 'Demo@123';
+export const DEMO_PASSWORD = 'Demo@123';
 
 interface StoredAccount {
   user: AuthUser;
@@ -595,6 +598,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const loginAsDemo = async (): Promise<{ success: boolean; error?: string }> => {
+    return login({ email: DEMO_USER.email, password: DEMO_PASSWORD });
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -615,6 +622,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           email: DEMO_USER.email,
           password: DEMO_PASSWORD
         },
+        loginAsDemo,
         resendVerificationEmail,
         pendingVerificationEmail
       }}
